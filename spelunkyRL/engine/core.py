@@ -1,31 +1,20 @@
 import os, socket, subprocess, json, atexit
 from datetime import datetime
 
-import numpy as np
 import gymnasium as gym
 
 from . import config
 
-class SpelunkyEnv(gym.Env):
+class SpelunkyRLEngine(gym.Env):
 
     ############## GYM interface ##############
 
-    def __init__(self, observation_space=None, reward_function=None, gamestate_to_observation=None):
+    # Frameskipping, 
+    def __init__(self, frames_per_step=4, speedup=True):
         super().__init__()
-        self.action_space = gym.spaces.MultiDiscrete([
-            3, # Movement X
-            3, # Movement Y
-            2, # Jump
-            2, # Whip
-            2, # Bomb
-            2, # Rope
-            2, # Run
-            2, # Door
-        ])       
-
-        self.observation_space = observation_space
-        self.reward_function = reward_function
-        self.gamestate_to_observation = gamestate_to_observation
+        
+        self.frames_per_step = frames_per_step
+        self.speedup = speedup
 
         # Start Spelunky
         self._game_init()
@@ -45,29 +34,45 @@ class SpelunkyEnv(gym.Env):
     def step(self, action):
         self._send_dict({
             "command": "step",
-            "input": action.tolist()
+            "input": action.tolist(),
+            "frames": self.frames_per_step,
         })
         
         gamestate = self._receive_dict()
-        done = bool(gamestate["health"] <= 0 or gamestate["win"] == 1)
+        done = bool(gamestate["player_info"]["health"] <= 0 or gamestate["screen_info"]["win"] == 1)
+
+        # # PRINT MAP INFO
+        # with open(config.log_file, "a") as f:
+        #     for row in gamestate["screen_info"]["map_info"]:
+        #         formatted_row = " ".join(f"{num:4}" for num in row)  # 4-character width
+        #         f.write(f"{formatted_row}\n")
+        # # PRINT ENTITIESº
+        # from collections import Counter
+        # from ..tools.id2name import id2name
+        # type_counts = Counter(id2name(entity[4])["name"] for entity in gamestate["entity_info"])
+        # with open(config.log_file, "a") as f:
+        #     f.write(f"Entities: {type_counts}\n")
 
         reward = self.reward_function(gamestate, self.last_gamestate)
         self.last_gamestate = gamestate
-        
         observation = self.gamestate_to_observation(gamestate)
 
-        if "log_file" in config.__dict__:
-            with open(config.log_file, "a") as f:
-                timestamp = datetime.now().strftime("%H:%M:%S:%f")[:-3]
-                f.write(f"-- {timestamp} {str(observation)}\n")
-
         return observation, reward, done, False, {}
-
+    
+    action_space = gym.spaces.MultiDiscrete([
+        3, # Movement X
+        3, # Movement Y
+        2, # Jump
+        2, # Whip
+        2, # Bomb
+        2, # Rope
+        2, # Run
+        2, # Door
+    ]) 
 
     ############ Spelunky  Communicaton ############
 
     def close(self):
-        return
         self._send_dict({
             "command": "close"
         })
@@ -92,7 +97,7 @@ class SpelunkyEnv(gym.Env):
             shell=True
         )
 
-        self.server_socket.settimeout(1.0)
+        self.server_socket.settimeout(5.0)
 
         while True:
             try:
@@ -107,13 +112,14 @@ class SpelunkyEnv(gym.Env):
 
     def _game_reset(self, seed = None):
         self._send_dict({
-            "command": "reset"
+            "command": "reset",
+            "speedup": self.speedup,
         })
 
     def _send_dict(self, dict):
         json_str = json.dumps(dict) + "\n"
         self.server.sendall(json_str.encode("utf-8"))
-
+    
     def _receive_dict(self):
         buffer = b""
         while not buffer.endswith(b"\n"):
@@ -125,20 +131,10 @@ class SpelunkyEnv(gym.Env):
         dict = json.loads(json_str)
         if "error" in dict:
             raise RuntimeError(dict["error"])
+        
+        if "log_file" in config.__dict__:
+            with open(config.log_file, "a") as f:
+                timestamp = datetime.now().strftime("%H:%M:%S:%f")[:-3]
+                f.write(f"-- {timestamp} {str(dict)}\n")
+            
         return dict
-
-
-# if __name__ == '__main__':
-#     env = SpelunkyEnv()
-#     env.reset()
-
-#     startTime = datetime.now()
-
-#     counter = 0
-#     while True:
-#         counter += 1
-#         if counter % 60 == 0:
-#             print(f"{counter/60} seconds have passed, FPS: {counter/(datetime.now()-startTime).total_seconds()}")
-#         observation, reward, _, done, _ = env.step(env.action_space.sample())
-#         if done:
-#             env.reset()

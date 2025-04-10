@@ -1,2 +1,2 @@
-from .core import SpelunkyEnv
+from .core import SpelunkyRLEngine
 from . import config
