@@ -1,7 +1,8 @@
-import os, socket, subprocess, json, atexit
+import os, socket, subprocess, json, atexit, psutil
 from datetime import datetime
 
 import gymnasium as gym
+import keyboard
 
 from . import config
 
@@ -53,7 +54,7 @@ class SpelunkyRLEngine(gym.Env):
         # with open(config.log_file, "a") as f:
         #     f.write(f"Entities: {type_counts}\n")
 
-        reward = self.reward_function(gamestate, self.last_gamestate)
+        reward = self.reward_function(gamestate, self.last_gamestate, action)
         self.last_gamestate = gamestate
         observation = self.gamestate_to_observation(gamestate)
 
@@ -91,23 +92,40 @@ class SpelunkyRLEngine(gym.Env):
         port = self.server_socket.getsockname()[1]
         os.environ["Spelunky_RL_Port"] = str(port)
 
-        self.game_process = subprocess.Popen(
+        self.launcher_process = subprocess.Popen(
             [executable] + args,
             cwd=config.playlunky_dir,
             shell=True
         )
+        self.game_process = None
+        self.server_socket.settimeout(0.05)
 
-        self.server_socket.settimeout(5.0)
+
 
         while True:
             try:
                 self.server, addr = self.server_socket.accept()
                 break
             except socket.timeout:
-                continue
-            except KeyboardInterrupt:
-                break
-        
+                pass
+
+            if self.game_process is not None and self.game_process.is_running():
+                pass
+            else:
+                if self.launcher_process.poll() is None:
+                    parent = psutil.Process(self.launcher_process.pid)
+                    children = parent.children(recursive=True)
+                    for child in children:
+                        if child.name().startswith("Spel2"):
+                            self.game_process = child
+
+                else:
+                    self.launcher_process = subprocess.Popen(
+                        [executable] + args,
+                        cwd=config.playlunky_dir,
+                        shell=True
+                    )
+
         atexit.register(self.close)
 
     def _game_reset(self, seed = None):
