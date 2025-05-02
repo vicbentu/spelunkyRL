@@ -19,3 +19,24 @@ Movable (holding) - 444 total
 from 194 to 627 (there are movable till 755, but also fx)
 from 899 to 906
 -- Not including from 844 to 895 (logical)
+
+
+
+
+POS_TYPE:
+
+AIR
+ALCOVE
+CEILING
+DEFAULT
+EMPTY
+FLOOR
+HOLE
+LAVA
+PIT
+SAFE
+SOLID
+WALL
+WALL_LEFT
+WALL_RIGHT
+WATER

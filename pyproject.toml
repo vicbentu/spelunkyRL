@@ -6,5 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "spelunkyRL"
 version = "0.1.0"
 
+dependencies = [
+    "gymnasium",
+    "numpy",
+    "torch",
+    "stable-baselines3",
+]
+
 [tool.setuptools.packages.find]
 include = ["spelunkyRL"]

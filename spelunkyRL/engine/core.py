@@ -1,8 +1,10 @@
-import os, socket, subprocess, json, atexit, psutil
+import os, socket, subprocess, json, atexit, psutil, random
 from datetime import datetime
+from typing import Any, Dict, Tuple, List, Optional
+
 
 import gymnasium as gym
-import keyboard
+
 
 from . import config
 
@@ -10,21 +12,44 @@ class SpelunkyRLEngine(gym.Env):
 
     ############## GYM interface ##############
 
-    # Frameskipping, 
-    def __init__(self, frames_per_step=4, speedup=True):
+    action_space: gym.spaces.MultiDiscrete = gym.spaces.MultiDiscrete([
+        3, # Movement X
+        3, # Movement Y
+        2, # Jump
+
+        # 2, # Whip
+        # 2, # Bomb
+        # 2, # Rope
+        # 2, # Run
+        # 2, # Door
+    ]) 
+
+    observation_space: gym.spaces.Dict
+
+    def __init__(self, frames_per_step: int = 4, speedup: bool = True, reset_options: dict = {}) -> None:
         super().__init__()
         
         self.frames_per_step = frames_per_step
         self.speedup = speedup
+        self.reset_options = reset_options
 
         # Start Spelunky
         self._game_init()
 
 
     # TODO: seed, level, items, gold, hp
-    def reset(self, seed=None, options=None):
+    def reset(
+        self,
+        *,
+        seed: Optional[int] = None,
+        options: Optional[Dict[str, Any]] = None,
+        **kwargs
+    ) -> Tuple[Dict, Dict[str, Any]]:
+        
         super().reset(seed=seed)
-        self._game_reset(seed=seed)
+        if options is None:
+            options = self.reset_options
+        self._game_reset(seed=seed, **options)
         
         gamestate = self._receive_dict() 
         self.last_gamestate = gamestate
@@ -32,22 +57,35 @@ class SpelunkyRLEngine(gym.Env):
         return observation, {}
 
 
-    def step(self, action):
+    def step(
+        self, action: Any
+    ) -> Tuple[Dict, float, bool, bool, Dict[str, Any]]:
+
         self._send_dict({
             "command": "step",
-            "input": action.tolist(),
+            "input": action.tolist() + [0,0,0,1,0],
+            # "input": [1,1,0,0] + action.tolist() + [0,0,0],
+            # "input": action.tolist(),
             "frames": self.frames_per_step,
         })
         
         gamestate = self._receive_dict()
         done = bool(gamestate["player_info"]["health"] <= 0 or gamestate["screen_info"]["win"] == 1)
+        if gamestate["screen_info"]["time"] >= 60*90:
+            done = True
+            gamestate["player_info"]["health"] = 0
+        if gamestate["screen_info"]["dist_to_goal"] < 1:
+            done = True
+            gamestate["screen_info"]["win"] = 1
 
-        # # PRINT MAP INFO
-        # with open(config.log_file, "a") as f:
+        # PRINT MAP INFO
+        # with open(r"log.txt", "a") as f:
+        #     # f.write(str(gamestate["screen_info"]["map_info"]) + "\n")
+        #     f.write("----------------------------------\n")
         #     for row in gamestate["screen_info"]["map_info"]:
-        #         formatted_row = " ".join(f"{num:4}" for num in row)  # 4-character width
+        #         formatted_row = " ".join(f"{cell[0]:4}" for cell in row)
         #         f.write(f"{formatted_row}\n")
-        # # PRINT ENTITIESº
+        # PRINT ENTITIESº
         # from collections import Counter
         # from ..tools.id2name import id2name
         # type_counts = Counter(id2name(entity[4])["name"] for entity in gamestate["entity_info"])
@@ -60,16 +98,7 @@ class SpelunkyRLEngine(gym.Env):
 
         return observation, reward, done, False, {}
     
-    action_space = gym.spaces.MultiDiscrete([
-        3, # Movement X
-        3, # Movement Y
-        2, # Jump
-        2, # Whip
-        2, # Bomb
-        2, # Rope
-        2, # Run
-        2, # Door
-    ]) 
+    
 
     ############ Spelunky  Communicaton ############
 
@@ -128,17 +157,21 @@ class SpelunkyRLEngine(gym.Env):
 
         atexit.register(self.close)
 
-    def _game_reset(self, seed = None):
+    def _game_reset(self, seed = None, ent_types_to_destroy = []) -> None:
+        if seed is None:
+            seed = random.randint(0, 2**32 - 1)  # Generate a random seed
         self._send_dict({
             "command": "reset",
             "speedup": self.speedup,
+            "seed": seed,
+            "ent_types_to_destroy": ent_types_to_destroy,
         })
 
-    def _send_dict(self, dict):
-        json_str = json.dumps(dict) + "\n"
+    def _send_dict(self, payload: Dict[str, Any]) -> None:
+        json_str = json.dumps(payload) + "\n"
         self.server.sendall(json_str.encode("utf-8"))
     
-    def _receive_dict(self):
+    def _receive_dict(self) -> Dict[str, Any]:
         buffer = b""
         while not buffer.endswith(b"\n"):
             data = self.server.recv(1024)
