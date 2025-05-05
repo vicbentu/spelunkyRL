@@ -19,8 +19,8 @@ local data = nil
 local transition = 0
 local speedup = false
 
-local x, y, vel_x, vel_y, health, money, bombs, ropes, layer, map_info, face_left_player, holding_type_player, back_item, dist_to_goal, pos_type_matrix = 
-      0, 0, 0,     0,     0,      0,     0,     0,     0,     0,        0,                 0,                  0,         0,            0
+local x, y, vel_x, vel_y, health, money, bombs, ropes, layer, map_info, face_left_player, holding_type_player, back_item, dist_to_goal, pos_type_matrix, char_state, can_jump = 
+      0, 0, 0,     0,     0,      0,     0,     0,     0,     0,        0,                 0,                  0,         0,            0,               0,          false
 local powerups = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0} -- 18 powerups, 0 = not, 1 = yes
 
 ---------------- PATHFINDING ----------------
@@ -254,6 +254,9 @@ local function get_info()
             end
         end
 
+        char_state = players[1].state
+        can_jump = players[1]:can_jump()
+
         entity_info = get_entities_info(x,y,layer)
         map_info = get_map_info(x, y, layer)
 
@@ -281,6 +284,8 @@ local function get_info()
             powerups = powerups,
             holding_type_player = holding_type_player,
             back_item = back_item,
+            char_state = char_state,
+            can_jump = can_jump,
         },
         
         screen_info = {

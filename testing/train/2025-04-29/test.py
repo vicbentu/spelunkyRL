@@ -20,7 +20,8 @@ from env import SpelunkyEnv
 
 def make_env():
     def _init():
-        env = SpelunkyEnv(frames_per_step=6, speedup=False, reset_options={"ent_types_to_destroy":[600,601]})
+        entities_to_destroy = [600,601] + list(range(219, 342))
+        env = SpelunkyEnv(frames_per_step=6, speedup=False, reset_options={"ent_types_to_destroy":entities_to_destroy})
         env = Monitor(env)
         return env
     return _init
@@ -28,14 +29,14 @@ def make_env():
 if __name__ == "__main__":
     n_envs = 4
     env = SubprocVecEnv([make_env() for _ in range(n_envs)])
-    env = VecNormalize.load(r"testing\train\29-04-25\models\ppo_spelunky_vecnormalize_4224000_steps.pkl", env)
+    env = VecNormalize.load(r"testing\train\2025-04-29\models\ppo_spelunky_vecnormalize_4224000_steps.pkl", env)
 
     # when testing
     env.training = False
     env.norm_reward = False
 
 
-    model_path = r"testing\train\29-04-25\models\ppo_spelunky_4224000_steps.zip"
+    model_path = r"testing\train\2025-04-29\models\ppo_spelunky_4224000_steps.zip"
     model = RecurrentPPO.load(
         model_path,
         env=env,

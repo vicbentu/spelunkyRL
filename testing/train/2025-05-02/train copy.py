@@ -1,25 +1,5 @@
-# Only ground, god mode
-# New cnn with reduced size
-# Used LSTM
-# Eliminated enemies from the map
-
-# 1 -> 
-# Changed hyperparameters to:
-# TIMESTEPS = 512 
-# gamma=0.99
-# ent=0.01
-# use get_linear (incorrect use)
-
-# 2 -> Changed hyperparameters to 
-# TIMESTEPS = 512
-# ent_coef     = 0.02,
-# gamma=0.99,
-# learning_rate = get_linear_fn(0.0005, 0.0001, 1),
-# clip_range    = get_linear_fn(0.2,    0.05, 1),
-
-# 3-> test again with params from 29-4-25 experiment
-
-
+# Run from latest model 29 #3
+# Reduced jump penalization
 
 from stable_baselines3 import PPO
 from sb3_contrib import RecurrentPPO
@@ -37,9 +17,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Dict
 
-
-
 from env import SpelunkyEnv
+from spelunkyRL.tools.save_replay import save_replay
 
 class SpelunkyFeaturesExtractor(BaseFeaturesExtractor):
 
@@ -72,19 +51,8 @@ class SpelunkyFeaturesExtractor(BaseFeaturesExtractor):
 
         self.linear = nn.Linear(n_flatten, features_dim)
 
-
     def forward(self, observations: Dict[str, torch.Tensor]) -> torch.Tensor:
         x = observations["map_info"].float()
-        # x = x.permute(0, 3, 1, 2)
-
-        # with torch.no_grad():
-        #     x_np = x.cpu().numpy()
-        #     np.set_printoptions(threshold=np.inf)  # disable truncation
-        #     with open(r"C:\TFG\Project\SpelunkyRL\Spelunky 2\Mods\Packs\spelunkyRL\log.txt", "a") as f:
-        #         f.write(f"Type: {type(x_np)}\n")
-        #         f.write(f"Shape: {x_np.shape}\n")
-        #         f.write(f"map_info: {x_np}\n")
-
         map_features = self.linear(self.map_cnn(x))
 
         return map_features
@@ -107,51 +75,62 @@ if __name__ == "__main__":
 
     num_envs = 8
     env = SubprocVecEnv([make_env() for _ in range(num_envs)])
-    env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_obs=15.)
+    # env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_obs=15.)
+    # env = VecNormalize.load(r"testing\train\2025-04-30\models3\ppo_spelunky_vecnormalize_6062080_steps.pkl", env)
+
 
 
     checkpoint_callback = CheckpointCallback(
         save_freq=TIMESTEPS*40,
-        save_path=r"testing\train\30-04-25\models3",
+        save_path=r"testing\train\2025-05-02\models2",
         name_prefix="ppo_spelunky",
-        save_vecnormalize=True,
     )
 
     # model = PPO(
-    model = RecurrentPPO(
-        policy="MultiInputLstmPolicy",
+    # model = RecurrentPPO(
+    #     policy="MultiInputLstmPolicy",
+    #     env=env,
+    #     verbose=2,
+    #     device="cuda",
+    #     n_steps=TIMESTEPS,
+    #     tensorboard_log=r"testing\tensorboardlogs",
+    #     policy_kwargs=dict(
+    #         features_extractor_class=SpelunkyFeaturesExtractor,
+    #         features_extractor_kwargs={},
+    #         net_arch=[64, 64],
+    #     ),
+
+    #     # ent_coef=LinearSchedule(0.02, 0.0, TOTAL_LOOPS * TIMESTEPS),
+    #     # learning_rate=LinearSchedule(0.0005, 0.0001, TOTAL_LOOPS * TIMESTEPS),
+    #     # clip_range=LinearSchedule(0.2, 0.05, TOTAL_LOOPS * TIMESTEPS),
+    #     # ent_coef     = 0.02,
+    #     # gamma=0.99,
+
+    #     # learning_rate = get_linear_fn(0.0005, 0.0001, TOTAL_LOOPS * TIMESTEPS),
+    #     # clip_range    = get_linear_fn(0.2,    0.05,  TOTAL_LOOPS * TIMESTEPS),
+    #     # learning_rate = get_linear_fn(0.0005, 0.0001, 1),
+    #     # clip_range    = get_linear_fn(0.2,    0.05, 1),
+
+    #     ent_coef=0.02,
+    #     gamma=0.98,
+    # )
+
+    model = RecurrentPPO.load(
+        r"testing\train\2025-04-30\models3\ppo_spelunky_6062080_steps.zip",
         env=env,
         verbose=2,
         device="cuda",
         n_steps=TIMESTEPS,
+        ent_coef=0.01,
+        gamma=0.97,
         tensorboard_log=r"testing\tensorboardlogs",
-        policy_kwargs=dict(
-            features_extractor_class=SpelunkyFeaturesExtractor,
-            features_extractor_kwargs={},
-            net_arch=[64, 64],
-        ),
-
-        # ent_coef=LinearSchedule(0.02, 0.0, TOTAL_LOOPS * TIMESTEPS),
-        # learning_rate=LinearSchedule(0.0005, 0.0001, TOTAL_LOOPS * TIMESTEPS),
-        # clip_range=LinearSchedule(0.2, 0.05, TOTAL_LOOPS * TIMESTEPS),
-        # ent_coef     = 0.02,
-        # gamma=0.99,
-
-        # learning_rate = get_linear_fn(0.0005, 0.0001, TOTAL_LOOPS * TIMESTEPS),
-        # clip_range    = get_linear_fn(0.2,    0.05,  TOTAL_LOOPS * TIMESTEPS),
-        # learning_rate = get_linear_fn(0.0005, 0.0001, 1),
-        # clip_range    = get_linear_fn(0.2,    0.05, 1),
-
-        ent_coef=0.02,
-        gamma=0.98,
-
-
     )
+
 
     try:
         model.learn(
             total_timesteps=TIMESTEPS * TOTAL_LOOPS,
-            tb_log_name="30-04-25_3_",
+            tb_log_name="2025-05-02_2",
             callback=[
                 checkpoint_callback,
             ],

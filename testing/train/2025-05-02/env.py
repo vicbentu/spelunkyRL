@@ -11,12 +11,41 @@ class SpelunkyEnv(SpelunkyRLEngine):
     ################## ENV CHARACTERISTICS ##################
 
     observation_space = Dict({
-        # 'map_info': Box(low=0, high=116, shape=(11, 21, 5), dtype=np.int32),
         'map_info': Box(low=0, high=116, shape=(5, 11, 21), dtype=np.int32),
+        "char_state": Discrete(23),
+        "can_jump"  : Discrete(2)
+        # "char_state": Box(low=0, high=22, shape=(1,), dtype=np.int32),
+        # "can_jump"  : Box(low=0, high=1, shape=(1,), dtype=np.int32),
+
     })
 
 
-    def reward_function(self, gamestate, last_gamestate, action):
+    def reward_function(self, gamestate, last_gamestate, action, done):
+
+        # Clipping
+        if gamestate["screen_info"]["time"] >= 60*90:
+        # if gamestate["screen_info"]["time"] >= 60*30:
+            done = True
+            gamestate["player_info"]["health"] = 0
+        if gamestate["screen_info"]["dist_to_goal"] < 1:
+            done = True
+            gamestate["screen_info"]["win"] = 1
+        
+        # No progress clipping
+        if gamestate["screen_info"]["dist_to_goal"] < getattr(self, "min_dist_to_goal", float("inf")):
+            self.min_dist_to_goal = gamestate["screen_info"]["dist_to_goal"]
+            self.no_improve_counter = 0
+        else:
+            self.no_improve_counter += 1
+
+        if self.no_improve_counter >= 100:
+            done = True
+
+        if done:
+            self.min_dist_to_goal = float("inf")
+
+        
+
         reward_val = -0.01  # small penalty for each step to encourage faster completion
         if gamestate["player_info"]["health"] <= 0:
             reward_val -= 5
@@ -25,8 +54,11 @@ class SpelunkyEnv(SpelunkyRLEngine):
             reward_val += 5
 
         reward_val += (last_gamestate["screen_info"]["dist_to_goal"] - gamestate["screen_info"]["dist_to_goal"])*0.1
+
+        if action[2]:
+            reward_val -= 0.02 # small penalty for jumping to encourage more efficient movement
         
-        return float(reward_val)
+        return float(reward_val), done
 
     def gamestate_to_observation(self, gamestate):
 
@@ -49,13 +81,18 @@ class SpelunkyEnv(SpelunkyRLEngine):
         #     f.write(f"map_info shape: {multi_hot.shape}\n")
         #     f.write(f"map_info:\n {multi_hot}\n")
 
+        observation["char_state"] = np.int32(gamestate["player_info"]["char_state"])
+        observation["can_jump"] = np.int32(int(gamestate["player_info"]["can_jump"]))
+
         return observation
 
 
 if __name__ == '__main__':
     from datetime import datetime
     env = SpelunkyEnv(speedup=False, frames_per_step=4, reset_options={"ent_types_to_destroy":[600,601]})
+    print("Game initialized")
     env.reset()
+    print("Game started")
 
     startTime = datetime.now()
 

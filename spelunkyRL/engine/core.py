@@ -5,8 +5,12 @@ from typing import Any, Dict, Tuple, List, Optional
 
 import gymnasium as gym
 
+import mss
+import numpy as np
+import win32gui, win32con, win32process, win32api, ctypes
 
 from . import config
+from spelunkyRL.tools.window_management import get_hwnd_for_pid, force_foreground_window, ensure_window_visible
 
 class SpelunkyRLEngine(gym.Env):
 
@@ -26,9 +30,10 @@ class SpelunkyRLEngine(gym.Env):
 
     observation_space: gym.spaces.Dict
 
-    def __init__(self, frames_per_step: int = 4, speedup: bool = True, reset_options: dict = {}) -> None:
+    def __init__(self, frames_per_step: int = 6, speedup: bool = True, reset_options: dict = {}, render_mode: str | None = "rgb_array",) -> None:
         super().__init__()
-        
+
+        self.render_mode = render_mode
         self.frames_per_step = frames_per_step
         self.speedup = speedup
         self.reset_options = reset_options
@@ -47,7 +52,7 @@ class SpelunkyRLEngine(gym.Env):
     ) -> Tuple[Dict, Dict[str, Any]]:
         
         super().reset(seed=seed)
-        if options is None:
+        if options is None: # TODO: Substitute options individually
             options = self.reset_options
         self._game_reset(seed=seed, **options)
         
@@ -71,12 +76,6 @@ class SpelunkyRLEngine(gym.Env):
         
         gamestate = self._receive_dict()
         done = bool(gamestate["player_info"]["health"] <= 0 or gamestate["screen_info"]["win"] == 1)
-        if gamestate["screen_info"]["time"] >= 60*90:
-            done = True
-            gamestate["player_info"]["health"] = 0
-        if gamestate["screen_info"]["dist_to_goal"] < 1:
-            done = True
-            gamestate["screen_info"]["win"] = 1
 
         # PRINT MAP INFO
         # with open(r"log.txt", "a") as f:
@@ -92,7 +91,7 @@ class SpelunkyRLEngine(gym.Env):
         # with open(config.log_file, "a") as f:
         #     f.write(f"Entities: {type_counts}\n")
 
-        reward = self.reward_function(gamestate, self.last_gamestate, action)
+        reward, done = self.reward_function(gamestate, self.last_gamestate, action, done)
         self.last_gamestate = gamestate
         observation = self.gamestate_to_observation(gamestate)
 
@@ -189,3 +188,26 @@ class SpelunkyRLEngine(gym.Env):
                 f.write(f"-- {timestamp} {str(dict)}\n")
             
         return dict
+
+    
+    ############ Render ############ 
+    metadata = {"render_modes": ["rgb_array"], "render_fps": 60}
+
+    def _get_window_bbox(self) -> dict:
+        pid = self.game_process.pid
+        hwnd = get_hwnd_for_pid(pid)
+
+        left, top, right, bottom = win32gui.GetWindowRect(hwnd)
+        return {"left": left, "top": top, "width": right - left, "height": bottom - top}
+
+    def render(self, mode="rgb_array"):
+        if mode != "rgb_array":
+            raise NotImplementedError("Only rgb_array mode is supported.")
+
+        hwnd = get_hwnd_for_pid(self.game_process.pid)
+        # force_foreground_window(hwnd)
+        ensure_window_visible(hwnd)
+
+        with mss.mss() as sct:
+            frame = np.asarray(sct.grab(self._get_window_bbox()))[..., :3]
+            return frame[:, :, ::-1]

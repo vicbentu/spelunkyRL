@@ -16,7 +16,27 @@ class SpelunkyEnv(SpelunkyRLEngine):
     })
 
 
-    def reward_function(self, gamestate, last_gamestate, action):
+    def reward_function(self, gamestate, last_gamestate, action, done):
+
+        # Clipping
+                # Clipping
+        if gamestate["screen_info"]["time"] >= 60*90:
+            done = True
+            gamestate["player_info"]["health"] = 0
+        if gamestate["screen_info"]["dist_to_goal"] < 1:
+            done = True
+        # No progress clipping
+        if gamestate["screen_info"]["dist_to_goal"] < getattr(self, "mind_dist_to_goal", float("inf")):
+            self.min_dist_to_goal = gamestate["screen_info"]["dist_to_goal"]
+            self.no_improve_counter = 0
+        else:
+            self.no_improve_counter += 1
+
+        if self.no_improve_counter >= 100:
+            done = True
+
+
+
         reward_val = -0.01  # small penalty for each step to encourage faster completion
         if gamestate["player_info"]["health"] <= 0:
             reward_val -= 5
@@ -26,7 +46,7 @@ class SpelunkyEnv(SpelunkyRLEngine):
 
         reward_val += (last_gamestate["screen_info"]["dist_to_goal"] - gamestate["screen_info"]["dist_to_goal"])*0.1
         
-        return float(reward_val)
+        return float(reward_val), done
 
     def gamestate_to_observation(self, gamestate):
 
@@ -48,7 +68,6 @@ class SpelunkyEnv(SpelunkyRLEngine):
         #     f.write("TEST\n")
         #     f.write(f"map_info shape: {multi_hot.shape}\n")
         #     f.write(f"map_info:\n {multi_hot}\n")
-
 
         return observation
 
