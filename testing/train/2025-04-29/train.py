@@ -80,16 +80,16 @@ def make_env():
 if __name__ == "__main__":
 
     TOTAL_LOOPS = 40000
-    TIMESTEPS = 400
+    TIMESTEPS = 512
 
     num_envs = 8
     env = SubprocVecEnv([make_env() for _ in range(num_envs)])
-    env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_obs=15.)
+    # env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_obs=15.)
 
 
     checkpoint_callback = CheckpointCallback(
         save_freq=TIMESTEPS*40,
-        save_path=r"testing\train\29-04-25\models",
+        save_path=r"testing\train\29-04-25\models2",
         name_prefix="ppo_spelunky",
         save_vecnormalize=True,
     )
@@ -101,7 +101,7 @@ if __name__ == "__main__":
         verbose=2,
         device="cuda",
         n_steps=TIMESTEPS,
-        tensorboard_log=r"testing\tensorboardlogs",
+        # tensorboard_log=r"testing\tensorboardlogs",
         policy_kwargs=dict(
             features_extractor_class=SpelunkyFeaturesExtractor,
             features_extractor_kwargs={},
@@ -116,7 +116,7 @@ if __name__ == "__main__":
     try:
         model.learn(
             total_timesteps=TIMESTEPS * TOTAL_LOOPS,
-            tb_log_name="29-04-25_1",
+            # tb_log_name="29-04-25_1",
             callback=[
                 checkpoint_callback,
             ],

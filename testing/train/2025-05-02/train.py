@@ -24,7 +24,11 @@
 # gamma=0.98,
 # Added char_state, can_jump
 
-# 6 -> TODO
+
+# 6 ->
+# Changed reward function to penalize early truncation
+
+# 7 -> TODO
 # lstm_hidden_size=512
 # n_lstm_layers=2,
 
@@ -101,7 +105,7 @@ class SpelunkyFeaturesExtractor(BaseFeaturesExtractor):
 
 def make_env():
     def _init():
-        entities_to_destroy = [600,601] + list(range(219, 342))
+        entities_to_destroy = [600,601] + list(range(219, 342)) + list(range(899, 906))
         env = SpelunkyEnv(frames_per_step=6, speedup=True, reset_options={"ent_types_to_destroy":entities_to_destroy})
         # if i == 0:
         #     env = RecordVideo(
@@ -128,7 +132,7 @@ if __name__ == "__main__":
 
     checkpoint_callback = CheckpointCallback(
         save_freq=TIMESTEPS*40,
-        save_path=r"testing\train\2025-05-02\models5",
+        save_path=r"testing\train\2025-05-02\models6",
         name_prefix="ppo_spelunky",
     )
 
@@ -179,7 +183,7 @@ if __name__ == "__main__":
     try:
         model.learn(
             total_timesteps=TIMESTEPS * TOTAL_LOOPS,
-            tb_log_name="2025-05-02_5",
+            tb_log_name="2025-05-02_6",
             callback=[
                 checkpoint_callback,
             ],

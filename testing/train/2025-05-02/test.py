@@ -19,17 +19,17 @@ from env import SpelunkyEnv
 
 def make_env(i):
     def _init():
-        entities_to_destroy = [600,601] + list(range(219, 342))
+        entities_to_destroy = [600,601] + list(range(219, 342)) + list(range(899, 906))
         env = SpelunkyEnv(frames_per_step=6, speedup=False, reset_options={"ent_types_to_destroy":entities_to_destroy})
 
         # Test
-        if i == 0:
-            env = RecordVideo(
-                env,
-                video_folder=r"videos",
-                episode_trigger= lambda x: x % 10 == 0, # every 10 episodes,
-                fps=10
-            )
+        # if i == 0:
+        #     env = RecordVideo(
+        #         env,
+        #         video_folder=r"videos",
+        #         episode_trigger= lambda x: x % 10 == 0, # every 10 episodes,
+        #         fps=10
+        #     )
         # 
 
         env = Monitor(env)
@@ -46,7 +46,7 @@ if __name__ == "__main__":
     # env.norm_reward = False
 
 
-    model_path = r"testing\train\2025-05-02\models2\ppo_spelunky_7864320_steps.zip"
+    model_path = r"testing\train\2025-05-02\models6\ppo_spelunky_5406720_steps.zip"
     model = RecurrentPPO.load(
         model_path,
         env=env,
@@ -83,7 +83,7 @@ if __name__ == "__main__":
             obs,
             state=lstm_state,
             episode_start=episode_start,
-            deterministic=False
+            deterministic=True
         )
 
         next_obs, rewards, dones, infos = env.step(actions)

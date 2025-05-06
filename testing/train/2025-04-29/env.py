@@ -25,6 +25,7 @@ class SpelunkyEnv(SpelunkyRLEngine):
             gamestate["player_info"]["health"] = 0
         if gamestate["screen_info"]["dist_to_goal"] < 1:
             done = True
+
         # No progress clipping
         if gamestate["screen_info"]["dist_to_goal"] < getattr(self, "mind_dist_to_goal", float("inf")):
             self.min_dist_to_goal = gamestate["screen_info"]["dist_to_goal"]
@@ -34,6 +35,8 @@ class SpelunkyEnv(SpelunkyRLEngine):
 
         if self.no_improve_counter >= 100:
             done = True
+        if done:
+            self.min_dist_to_goal = float("inf")
 
 
 

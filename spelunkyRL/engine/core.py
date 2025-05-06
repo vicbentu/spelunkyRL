@@ -91,11 +91,11 @@ class SpelunkyRLEngine(gym.Env):
         # with open(config.log_file, "a") as f:
         #     f.write(f"Entities: {type_counts}\n")
 
-        reward, done = self.reward_function(gamestate, self.last_gamestate, action, done)
+        reward, done, truncated = self.reward_function(gamestate, self.last_gamestate, action, done)
         self.last_gamestate = gamestate
         observation = self.gamestate_to_observation(gamestate)
 
-        return observation, reward, done, False, {}
+        return observation, reward, done, truncated, {}
     
     
 

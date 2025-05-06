@@ -193,8 +193,6 @@ function get_entities_info(x, y, layer)
 end
 
 local function get_map_info(x, y, layer)
-    -- x: 37.0, y: 118.04999542236, layer: 0
-    local left_x, top_y, right_x, bottom_y = get_bounds()
     local start_x, end_x = math.round(x - 10), math.round(x + 10)
     local start_y, end_y = math.round(y - 5), math.round(y + 5)
 
@@ -257,7 +255,7 @@ local function get_info()
         char_state = players[1].state
         can_jump = players[1]:can_jump()
 
-        entity_info = get_entities_info(x,y,layer)
+        -- entity_info = get_entities_info(x,y,layer)
         map_info = get_map_info(x, y, layer)
 
         -- get distance to goal
@@ -298,7 +296,7 @@ local function get_info()
             dist_to_goal = dist_to_goal
         },
 
-        entity_info = entity_info,
+        -- entity_info = entity_info,
         
     }
     if transition == 1 then
@@ -326,7 +324,7 @@ set_callback(function()
 
     if data["command"] == "reset" then
         reset(data["seed"])
-        data["frames"] = 10
+        data["frames"] = 60
     elseif data["command"] == "step" and #players ~= 0 then
         local python_input = data["input"]
         local last6 = {}

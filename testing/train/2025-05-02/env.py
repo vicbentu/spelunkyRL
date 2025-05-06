@@ -21,15 +21,16 @@ class SpelunkyEnv(SpelunkyRLEngine):
 
 
     def reward_function(self, gamestate, last_gamestate, action, done):
+        truncated = False
+        reward_val = -0.01  # small penalty for each step to encourage faster completion
 
         # Clipping
-        if gamestate["screen_info"]["time"] >= 60*90:
-        # if gamestate["screen_info"]["time"] >= 60*30:
-            done = True
-            gamestate["player_info"]["health"] = 0
+        if gamestate["screen_info"]["time"] >= 60*90: # 900 steps
+            truncated = True
+            reward_val -= 5
         if gamestate["screen_info"]["dist_to_goal"] < 1:
             done = True
-            gamestate["screen_info"]["win"] = 1
+            reward_val += 5
         
         # No progress clipping
         if gamestate["screen_info"]["dist_to_goal"] < getattr(self, "min_dist_to_goal", float("inf")):
@@ -38,27 +39,22 @@ class SpelunkyEnv(SpelunkyRLEngine):
         else:
             self.no_improve_counter += 1
 
-        if self.no_improve_counter >= 100:
-            done = True
-
-        if done:
-            self.min_dist_to_goal = float("inf")
-
-        
-
-        reward_val = -0.01  # small penalty for each step to encourage faster completion
-        if gamestate["player_info"]["health"] <= 0:
+        if self.no_improve_counter >= 200:
+            truncated = True
             reward_val -= 5
 
-        if gamestate["screen_info"]["win"]:
-            reward_val += 5
+        if truncated:
+            timesteps = gamestate["screen_info"]["time"] / 6
+            reward_val -= 0.01 * (900 - timesteps)
+        if done or truncated:
+            self.min_dist_to_goal = float("inf")
 
         reward_val += (last_gamestate["screen_info"]["dist_to_goal"] - gamestate["screen_info"]["dist_to_goal"])*0.1
 
         if action[2]:
-            reward_val -= 0.02 # small penalty for jumping to encourage more efficient movement
+            reward_val -= 0.02
         
-        return float(reward_val), done
+        return float(reward_val), done and not truncated, truncated
 
     def gamestate_to_observation(self, gamestate):
 
