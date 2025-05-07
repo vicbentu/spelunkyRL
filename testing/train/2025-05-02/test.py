@@ -20,24 +20,27 @@ from env import SpelunkyEnv
 def make_env(i):
     def _init():
         entities_to_destroy = [600,601] + list(range(219, 342)) + list(range(899, 906))
-        env = SpelunkyEnv(frames_per_step=6, speedup=False, reset_options={"ent_types_to_destroy":entities_to_destroy})
+        # env = SpelunkyEnv(frames_per_step=6, speedup=True, reset_options={"ent_types_to_destroy":entities_to_destroy})
 
-        # Test
-        # if i == 0:
-        #     env = RecordVideo(
-        #         env,
-        #         video_folder=r"videos",
-        #         episode_trigger= lambda x: x % 10 == 0, # every 10 episodes,
-        #         fps=10
-        #     )
-        # 
+        # TESTEND
+        if i == 0:
+            env = SpelunkyEnv(frames_per_step=6, speedup=True, reset_options={"ent_types_to_destroy":entities_to_destroy}, render_enabled=True)
+            env = RecordVideo(
+                env,
+                video_folder=r"videos",
+                episode_trigger= lambda x: x % 10 == 0, # every 10 episodes,
+                fps=10
+            )
+        else:
+            env = SpelunkyEnv(frames_per_step=6, speedup=True, reset_options={"ent_types_to_destroy":entities_to_destroy}, render_enabled=False)
+        # TESTEND
 
         env = Monitor(env)
         return env
     return _init
 
 if __name__ == "__main__":
-    n_envs = 4
+    n_envs = 1
     env = SubprocVecEnv([make_env(i) for i in range(n_envs)])
     # env = VecNormalize.load(r"testing\train\2025-05-02\models\ppo_spelunky_vecnormalize_8519680_steps.pkl", env)
 
@@ -83,7 +86,7 @@ if __name__ == "__main__":
             obs,
             state=lstm_state,
             episode_start=episode_start,
-            deterministic=True
+            deterministic=False
         )
 
         next_obs, rewards, dones, infos = env.step(actions)

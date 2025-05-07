@@ -8,6 +8,9 @@ import gymnasium as gym
 import mss
 import numpy as np
 import win32gui, win32con, win32process, win32api, ctypes
+import win32ui
+from PIL import Image
+from ..tools.frame_grabber import FrameGrabber
 
 from . import config
 from spelunkyRL.tools.window_management import get_hwnd_for_pid, force_foreground_window, ensure_window_visible
@@ -30,13 +33,14 @@ class SpelunkyRLEngine(gym.Env):
 
     observation_space: gym.spaces.Dict
 
-    def __init__(self, frames_per_step: int = 6, speedup: bool = True, reset_options: dict = {}, render_mode: str | None = "rgb_array",) -> None:
+    def __init__(self, frames_per_step: int = 6, speedup: bool = True, reset_options: dict = {}, render_enabled: bool = False) -> None:
         super().__init__()
 
-        self.render_mode = render_mode
         self.frames_per_step = frames_per_step
         self.speedup = speedup
         self.reset_options = reset_options
+        self.render_enabled = render_enabled
+        self.render_mode = 'rgb_array'
 
         # Start Spelunky
         self._game_init()
@@ -155,6 +159,9 @@ class SpelunkyRLEngine(gym.Env):
                     )
 
         atexit.register(self.close)
+        self.hwnd = get_hwnd_for_pid(self.game_process.pid)
+        if self.render_enabled:
+            self.grabber = FrameGrabber(self.hwnd)
 
     def _game_reset(self, seed = None, ent_types_to_destroy = []) -> None:
         if seed is None:
@@ -193,21 +200,10 @@ class SpelunkyRLEngine(gym.Env):
     ############ Render ############ 
     metadata = {"render_modes": ["rgb_array"], "render_fps": 60}
 
-    def _get_window_bbox(self) -> dict:
-        pid = self.game_process.pid
-        hwnd = get_hwnd_for_pid(pid)
-
-        left, top, right, bottom = win32gui.GetWindowRect(hwnd)
-        return {"left": left, "top": top, "width": right - left, "height": bottom - top}
-
     def render(self, mode="rgb_array"):
         if mode != "rgb_array":
-            raise NotImplementedError("Only rgb_array mode is supported.")
-
-        hwnd = get_hwnd_for_pid(self.game_process.pid)
-        # force_foreground_window(hwnd)
-        ensure_window_visible(hwnd)
-
-        with mss.mss() as sct:
-            frame = np.asarray(sct.grab(self._get_window_bbox()))[..., :3]
-            return frame[:, :, ::-1]
+            raise NotImplementedError
+        if self.render_enabled is False:
+            raise RuntimeError("Use render_enabled=True on init to be able to record replays")
+        
+        return self.grabber.frame.copy()
