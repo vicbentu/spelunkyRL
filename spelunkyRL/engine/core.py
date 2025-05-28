@@ -4,16 +4,10 @@ from typing import Any, Dict, Tuple, List, Optional
 
 
 import gymnasium as gym
+import win32gui
 
-import mss
-import numpy as np
-import win32gui, win32con, win32process, win32api, ctypes
-import win32ui
-from PIL import Image
 from ..tools.frame_grabber import FrameGrabber
-
-from . import config
-from spelunkyRL.tools.window_management import get_hwnd_for_pid, force_foreground_window, ensure_window_visible
+from spelunkyRL.tools.window_management import get_hwnd_for_pid
 
 class SpelunkyRLEngine(gym.Env):
 
@@ -23,26 +17,39 @@ class SpelunkyRLEngine(gym.Env):
         3, # Movement X
         3, # Movement Y
         2, # Jump
-
-        # 2, # Whip
-        # 2, # Bomb
-        # 2, # Rope
-        # 2, # Run
-        # 2, # Door
+        2, # Whip
+        2, # Bomb
+        2, # Rope
+        2, # Run
+        2, # Door
     ]) 
 
     observation_space: gym.spaces.Dict
 
-    def __init__(self, frames_per_step: int = 6, speedup: bool = True, reset_options: dict = {}, render_enabled: bool = False) -> None:
+    def __init__(
+            self,
+            spelunky_dir: str,
+            playlunky_dir: str,
+            frames_per_step: int = 6,
+            speedup: bool = True,
+            render_enabled: bool = False,
+            console: bool = False,
+            log_file: str = None,
+            **kwargs
+        ) -> None:
+
         super().__init__()
 
+        self.spelunky_dir = spelunky_dir
+        self.playlunky_dir = playlunky_dir
         self.frames_per_step = frames_per_step
         self.speedup = speedup
-        self.reset_options = reset_options
+        self.reset_options = getattr(self, "reset_options", {}) | kwargs
         self.render_enabled = render_enabled
         self.render_mode = 'rgb_array'
+        self.console = console
+        self.log_file = log_file
 
-        # Start Spelunky
         self._game_init()
 
 
@@ -51,14 +58,12 @@ class SpelunkyRLEngine(gym.Env):
         self,
         *,
         seed: Optional[int] = None,
-        options: Optional[Dict[str, Any]] = None,
+        # options: Optional[Dict[str, Any]] = {},
         **kwargs
     ) -> Tuple[Dict, Dict[str, Any]]:
         
         super().reset(seed=seed)
-        if options is None: # TODO: Substitute options individually
-            options = self.reset_options
-        self._game_reset(seed=seed, **options)
+        self._game_reset(seed=seed, **(self.reset_options|kwargs))
         
         gamestate = self._receive_dict() 
         self.last_gamestate = gamestate
@@ -69,24 +74,27 @@ class SpelunkyRLEngine(gym.Env):
     def step(
         self, action: Any
     ) -> Tuple[Dict, float, bool, bool, Dict[str, Any]]:
-
+        
+        action = action.tolist() if not hasattr(self, 'action_to_input') else self.action_to_input(action.tolist())
         self._send_dict({
             "command": "step",
-            "input": action.tolist() + [0,0,0,1,0],
-            # "input": [1,1,0,0] + action.tolist() + [0,0,0],
-            # "input": action.tolist(),
+            "input": action,
             "frames": self.frames_per_step,
+            "additional_data": getattr(self, "additional_data", [])
         })
         
         gamestate = self._receive_dict()
-        done = bool(gamestate["player_info"]["health"] <= 0 or gamestate["screen_info"]["win"] == 1)
+
+        info = {
+            "success": False
+        }
 
         # PRINT MAP INFO
         # with open(r"log.txt", "a") as f:
-        #     # f.write(str(gamestate["screen_info"]["map_info"]) + "\n")
+        #     f.write(str(gamestate["map_info"]) + "\n")
         #     f.write("----------------------------------\n")
-        #     for row in gamestate["screen_info"]["map_info"]:
-        #         formatted_row = " ".join(f"{cell[0]:4}" for cell in row)
+        #     for row in gamestate["map_info"]:
+        #         formatted_row = " ".join(f"{cell:>3}" for cell in row)
         #         f.write(f"{formatted_row}\n")
         # PRINT ENTITIESº
         # from collections import Counter
@@ -95,11 +103,12 @@ class SpelunkyRLEngine(gym.Env):
         # with open(config.log_file, "a") as f:
         #     f.write(f"Entities: {type_counts}\n")
 
-        reward, done, truncated = self.reward_function(gamestate, self.last_gamestate, action, done)
+        reward, done, truncated, info = self.reward_function(gamestate, self.last_gamestate, action, info)
+        done = done or bool(gamestate["basic_info"]["health"] <= 0 or gamestate["basic_info"]["win"] == 1)
         self.last_gamestate = gamestate
         observation = self.gamestate_to_observation(gamestate)
 
-        return observation, reward, done, truncated, {}
+        return observation, reward, done, truncated, info
     
     
 
@@ -109,25 +118,32 @@ class SpelunkyRLEngine(gym.Env):
         self._send_dict({
             "command": "close"
         })
+        
+        if hasattr(self, "game_process") and self.game_process is not None:
+            try:
+                self.game_process.terminate()
+                self.game_process.wait(timeout=5)
+            except Exception:
+                pass
 
     def _game_init(self):
 
-        executable = "playlunky_launcher.exe"
+        executable_path = os.path.join(self.playlunky_dir, "playlunky_launcher.exe")
         args = [
-            f'-exe_dir={config.spelunky_dir}',
-            *(['-console'] if config.console else [])
+            f'-exe_dir={self.spelunky_dir}',
+            *(['-console'] if self.console else [])
         ]
         
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind(('127.0.0.1', 0))  # bind to any available port
-        self.server_socket.listen(1)  # listen for 1 connection
+        self.server_socket.bind(('127.0.0.1', 0))
+        self.server_socket.listen(1)
         port = self.server_socket.getsockname()[1]
         os.environ["Spelunky_RL_Port"] = str(port)
 
         self.launcher_process = subprocess.Popen(
-            [executable] + args,
-            cwd=config.playlunky_dir,
-            shell=True
+            [executable_path] + args,
+            cwd=self.playlunky_dir,
+            shell=False,
         )
         self.game_process = None
         self.server_socket.settimeout(0.05)
@@ -153,8 +169,8 @@ class SpelunkyRLEngine(gym.Env):
 
                 else:
                     self.launcher_process = subprocess.Popen(
-                        [executable] + args,
-                        cwd=config.playlunky_dir,
+                        [executable_path] + args,
+                        cwd=self.playlunky_dir,
                         shell=True
                     )
 
@@ -162,15 +178,39 @@ class SpelunkyRLEngine(gym.Env):
         self.hwnd = get_hwnd_for_pid(self.game_process.pid)
         if self.render_enabled:
             self.grabber = FrameGrabber(self.hwnd)
+            current_title = win32gui.GetWindowText(self.hwnd)
+            new_title = f"R_{current_title}"
+            win32gui.SetWindowText(self.hwnd, new_title)
 
-    def _game_reset(self, seed = None, ent_types_to_destroy = []) -> None:
+    def _game_reset(
+            self,
+            seed:int = None,
+            ent_types_to_destroy = [],
+            manual_control: bool = False,
+            god_mode: bool = False,
+            hp: int = 7,
+            bombs: int = 7,
+            ropes: int = 7,
+            world: int = 1,
+            level: int = 1
+            # TODO: add items, gold, powerups
+        ) -> None:
+        
         if seed is None:
-            seed = random.randint(0, 2**32 - 1)  # Generate a random seed
+            seed = random.randint(0, 2**32 - 1)
         self._send_dict({
             "command": "reset",
             "speedup": self.speedup,
             "seed": seed,
             "ent_types_to_destroy": ent_types_to_destroy,
+            "additional_data": self.additional_data,
+            "manual_control": manual_control,
+            "god_mode": god_mode,
+            "hp": hp,
+            "bombs": bombs,
+            "ropes": ropes,
+            "world": world,
+            "level": level
         })
 
     def _send_dict(self, payload: Dict[str, Any]) -> None:
@@ -189,8 +229,8 @@ class SpelunkyRLEngine(gym.Env):
         if "error" in dict:
             raise RuntimeError(dict["error"])
         
-        if "log_file" in config.__dict__:
-            with open(config.log_file, "a") as f:
+        if self.log_file is not None:
+            with open(self.log_file, "a") as f:
                 timestamp = datetime.now().strftime("%H:%M:%S:%f")[:-3]
                 f.write(f"-- {timestamp} {str(dict)}\n")
             
@@ -206,4 +246,4 @@ class SpelunkyRLEngine(gym.Env):
         if self.render_enabled is False:
             raise RuntimeError("Use render_enabled=True on init to be able to record replays")
         
-        return self.grabber.frame.copy()
+        return self.grabber.get_frame()

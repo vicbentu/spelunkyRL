@@ -15,7 +15,6 @@ import numpy as np
 import torch as th
 
 
-
 from env import SpelunkyEnv
 
 def make_env(i):
@@ -24,8 +23,8 @@ def make_env(i):
         # env = SpelunkyEnv(frames_per_step=6, speedup=True, reset_options={"ent_types_to_destroy":entities_to_destroy})
 
         # TESTEND
-        if i == 0:
-        # if False:
+        # if i == 0:
+        if False:
             env = SpelunkyEnv(frames_per_step=6, speedup=True, reset_options={"ent_types_to_destroy":entities_to_destroy}, render_enabled=True)
             env = RecordVideo(
                 env,
@@ -34,7 +33,14 @@ def make_env(i):
                 fps=10
             )
         else:
-            env = SpelunkyEnv(frames_per_step=6, speedup=True, reset_options={"ent_types_to_destroy":entities_to_destroy}, render_enabled=False)
+            env = gym.make("LunarLander-v3", render_mode="rgb_array")
+            env = gym.wrappers.RecordVideo(
+                env,
+                video_folder=r"videos",
+                episode_trigger=lambda x: True,
+                fps=60
+            )
+            # env = SpelunkyEnv(frames_per_step=6, speedup=True, reset_options={"ent_types_to_destroy":entities_to_destroy}, render_enabled=False)
         # TESTEND
 
         env = Monitor(env)
@@ -43,38 +49,22 @@ def make_env(i):
 
 if __name__ == "__main__":
     n_envs = 1
-    # env = SubprocVecEnv([make_env(i) for i in range(n_envs)])
-    env = SpelunkyEnv(
-        frames_per_step=6,
-        speedup=True,
-        reset_options={"ent_types_to_destroy":[]},
-        render_enabled=True
-    )
-    # env = RecordVideo(
-    #     env,
-    #     video_folder=r"videos",
-    #     episode_trigger=lambda x: True,
-    #     fps=10
+    env = SubprocVecEnv([make_env(i) for i in range(n_envs)])
+
+
+    # model_path = r"testing\train\2025-05-02\models6\ppo_spelunky_5406720_steps.zip"
+    # model = RecurrentPPO.load(
+    #     model_path,
+    #     env=env,
+    #     # tensorboard_log=r"logs"
     # )
 
-    # when testing
-    # env.training = False
-    # env.norm_reward = False
-
-
-    model_path = r"testing\train\2025-05-02\models6\ppo_spelunky_5406720_steps.zip"
-    model = RecurrentPPO.load(
-        model_path,
-        env=env,
-        # tensorboard_log=r"logs"
-    )
-
-    num_episodes_to_watch = 50
+    num_episodes_to_watch = 5000
     lstm_state = None
     episode_start = np.ones((n_envs,), dtype=bool)
 
     obs = env.reset()
-    num_episodes = 0
+    num_episodes = [0] * n_envs
 
     ###### TRYING THINGS
     # model = RecurrentPPO.load(
@@ -96,17 +86,22 @@ if __name__ == "__main__":
     startTime = datetime.now()
     counter = 0
 
-    while num_episodes < num_episodes_to_watch:
+    while any(ep < num_episodes_to_watch for ep in num_episodes):
 
         counter += 1
         if counter % 100 == 0:
             print(f"{counter} frames have passed, FPS: {counter/(datetime.now()-startTime).total_seconds()}")
 
 
-        # actions, _ = model.predict(obs, deterministic=True)
-        action = env.action_space.sample()
+        actions = [env.action_space.sample() for _ in range(n_envs)]
+        # actions, lstm_state = model.predict(
+        #     obs,
+        #     state=lstm_state,
+        #     episode_start=episode_start,
+        #     deterministic=False
+        # )
 
-        next_obs, reward, done, info, _ = env.step(action)
+        next_obs, rewards, dones, infos = env.step(actions)
 
         # # ------ probability inspection --------------------------------------
         # def action_probs(dist):
@@ -128,12 +123,12 @@ if __name__ == "__main__":
         # print(rewards)
         # # --------------------------------------------------------------------
 
-        if done:
-            num_episodes += 1
-            obs = env.reset()
-
-
-        frame = env.render()
+        episode_start = dones.copy()
+        for idx, done in enumerate(dones):
+            if done:
+                num_episodes[idx] += 1
+                # lstm_state[idx] = None
+        obs = next_obs
 
     env.close()
 

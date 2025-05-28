@@ -1,44 +1,41 @@
-import threading
-import win32gui, win32ui, win32con
+import threading, ctypes
+import win32gui, win32ui
 import numpy as np
-import ctypes
-from PIL import Image
 
-def _grab(hwnd):
-    left, top, right, bottom = win32gui.GetClientRect(hwnd)
-    width, height = right - left, bottom - top
-
-    hwndDC = win32gui.GetWindowDC(hwnd)
-    mfcDC  = win32ui.CreateDCFromHandle(hwndDC)
-    saveDC = mfcDC.CreateCompatibleDC()
-    saveBitMap = win32ui.CreateBitmap()
-    saveBitMap.CreateCompatibleBitmap(mfcDC, width, height)
-    saveDC.SelectObject(saveBitMap)
-
-    result = ctypes.windll.user32.PrintWindow(hwnd, saveDC.GetSafeHdc(), 2)
-    bmpinfo = saveBitMap.GetInfo()
-    bmpstr = saveBitMap.GetBitmapBits(True)
-    img = Image.frombuffer('RGB', (bmpinfo['bmWidth'], bmpinfo['bmHeight']), bmpstr, 'raw', 'BGRX', 0, 1)
-
-    win32gui.DeleteObject(saveBitMap.GetHandle())
-    saveDC.DeleteDC()
-    mfcDC.DeleteDC()
-    win32gui.ReleaseDC(hwnd, hwndDC)
-
-    return np.array(img)
 
 class FrameGrabber(threading.Thread):
-    """
-    1. Waits until `need_frame` is set.
-    2. Grabs exactly ONE frame and stores it in `self.frame`.
-    3. Sets `frame_ready` to wake the main Gym thread.
-    """
     def __init__(self, hwnd):
         super().__init__(daemon=True)
         self.hwnd = hwnd
-        self.frame  = None
+
+        left, top, right, bottom = win32gui.GetClientRect(hwnd)
+        self.w, self.h = right - left, bottom - top
+
+        hdc_window = win32gui.GetWindowDC(hwnd)
+        self.mfcDC  = win32ui.CreateDCFromHandle(hdc_window)
+        self.saveDC = self.mfcDC.CreateCompatibleDC()
+        self.bmp    = win32ui.CreateBitmap()
+        self.bmp.CreateCompatibleBitmap(self.mfcDC, self.w, self.h)
+        self.saveDC.SelectObject(self.bmp)
+
+        self._buf  = (ctypes.c_char * (self.w * self.h * 4))()
+        self.frame = np.empty((self.h, self.w, 3), dtype=np.uint8)
+
         self.start()
 
     def run(self):
+        gdi  = ctypes.windll.gdi32
+        user = ctypes.windll.user32
         while True:
-            self.frame = _grab(self.hwnd)
+            user.PrintWindow(self.hwnd, self.saveDC.GetSafeHdc(), 2)
+            gdi.GetBitmapBits(self.bmp.GetHandle(), len(self._buf),
+                              ctypes.byref(self._buf))
+            np.copyto(
+                self.frame,
+                np.frombuffer(self._buf, dtype=np.uint8)
+                  .reshape(self.h, self.w, 4)[..., :3][:, :, ::-1])
+            
+            self.frame = self.frame.copy()
+
+    def get_frame(self):
+        return self.frame.copy()

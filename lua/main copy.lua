@@ -17,13 +17,11 @@ print("Connected to Python server!")
 --------------- GLOBAL VARIABLES ----------------
 local transition = 0
 local speedup = false
-local manual_control = false
 local speedup_counter = 100
 local data = {
     frames = 0,
     command = "pass"
 }
-local tiles = nil
 
 local x, y, vel_x, vel_y, health, money, bombs, ropes, layer, map_info, face_left_player, holding_type_player, back_item, dist_to_goal, pos_type_matrix, char_state, can_jump = 
       0, 0, 0,     0,     0,      0,     0,     0,     0,     0,        0,                 0,                  0,         0,            0,               0,          false
@@ -40,9 +38,6 @@ local pf_ntiles     = 0          -- rebuild only if the number of floor tiles ch
 local pf_xmin, pf_ymin, pf_xmax, pf_ymax = 0,0,0,0
 local pf_goalx, pf_goaly = 0,0   -- exit cell coords
 local pf_dirty = true
-local last_distance = -1
-local pf_dist = {}
-
 
 ---------------- AUX FUNCTIONS ----------------
 local function safe(val, default)
@@ -66,120 +61,64 @@ function destroy_entities(entity_types)
     end
 end
 
-
-local function pf_build_distance_field()
-    pf_dist = {}
-    for y = 1, #pf_board do
-        pf_dist[y] = {}
-        for x = 1, #pf_board[1] do
-            pf_dist[y][x] = -1
-        end
-    end
-
-    local qx, qy = {}, {}
-    local qh, qt = 1, 1
-
-    local function enqueue(x, y, d)
-        qx[qt], qy[qt] = x, y
-        pf_dist[y][x]  = d
-        qt = qt + 1
-    end
-
-    enqueue(pf_goalx, pf_goaly, 0)
-
-    while qh < qt do
-        local x, y   = qx[qh], qy[qh]
-        local d_next = pf_dist[y][x] + 1
-        qh = qh + 1
-
-        if y > 1               and pf_board[y-1][x] == 0 and pf_dist[y-1][x] < 0 then enqueue(x,   y-1, d_next) end
-        if y < #pf_board       and pf_board[y+1][x] == 0 and pf_dist[y+1][x] < 0 then enqueue(x,   y+1, d_next) end
-        if x > 1               and pf_board[y][x-1] == 0 and pf_dist[y][x-1] < 0 then enqueue(x-1, y,   d_next) end
-        if x < #pf_board[1]    and pf_board[y][x+1] == 0 and pf_dist[y][x+1] < 0 then enqueue(x+1, y,   d_next) end
-    end
-end
-
-
+-- Build / refresh the grid
 local function pf_refresh()
     local tiles = get_entities_by(0, MASK.FLOOR, 0)
     if #tiles == pf_ntiles then return end
-    pf_ntiles = #tiles
 
-    pf_tile_lookup = {}
-    local xmin, xmax =  math.huge, -math.huge
-    local ymin, ymax = -math.huge,  math.huge
-
-    local blocking = {}
-
-    for _, uid in ipairs(tiles) do
-        local e        = get_entity(uid)
-        local tx,  ty  = math.floor(e.x), math.floor(e.y)
-        local layer    = e.layer
-
-        pf_tile_lookup[layer]           = pf_tile_lookup[layer]           or {}
-        pf_tile_lookup[layer][ty]       = pf_tile_lookup[layer][ty]       or {}
-        pf_tile_lookup[layer][ty][tx]   = e.type.id
-
-        if tx < xmin then xmin = tx end
-        if tx > xmax then xmax = tx end
-        if ty > ymin then ymin = ty end
-        if ty < ymax then ymax = ty end
-
-        if (test_flag(e.flags, 3) and e.type.id ~= ENT_TYPE.FLOOR_PIPE)
-           or e.type.id == ENT_TYPE.FLOOR_SPIKES then
-            blocking[ty]      = blocking[ty] or {}
-            blocking[ty][tx]  = true
-        end
-
-    end
-
-    pf_xmin, pf_ymin, pf_xmax, pf_ymax = xmin, ymin, xmax, ymax
-
-    pf_board = {}
-    for y = ymin, ymax, -1 do
+    -- Re‑compute bounds & blank board
+    pf_ntiles      = #tiles
+    pf_xmin,pf_ymin,pf_xmax,pf_ymax = get_bounds()
+    pf_board       = {}
+    for y = pf_ymin - 0.5, pf_ymax + 0.5, -1 do
         local row = {}
-        for x = xmin, xmax do
-            if blocking[y] and blocking[y][x] then
-                row[#row+1] = 1
-            else
-                row[#row+1] = 0
-            end
-        end
+        for x = pf_xmin + 0.5, pf_xmax - 0.5, 1 do row[#row+1] = 0 end
         pf_board[#pf_board+1] = row
     end
 
+    -- Mark blocking tiles
+    for _,uid in ipairs(tiles) do
+        local e = get_entity(uid)
+        if (test_flag(e.flags,3) and e.type.id ~= ENT_TYPE.FLOOR_PIPE)
+           or e.type.id == ENT_TYPE.FLOOR_SPIKES then
+            local tx = math.floor( e.x - pf_xmin + 1 )
+            local ty = math.floor( pf_ymin - e.y + 1 )
+            if pf_board[ty] and pf_board[ty][tx] then pf_board[ty][tx] = 1 end
+        end
+    end
+
+    -- Goal (first exit door we see)
     local exits = get_entities_by_type(ENT_TYPE.FLOOR_DOOR_EXIT)
     if #exits > 0 then
-        local gx, gy = get_position(exits[1])
-        pf_goalx = math.floor(gx - xmin + 1)
-        pf_goaly = math.floor(ymin - gy  + 1)
+        local gx,gy = get_position(exits[1])
+        pf_goalx = math.floor( gx - pf_xmin + 1 )
+        pf_goaly = math.floor( pf_ymin - gy + 1 )
     end
 
     pf_grid   = Grid(pf_board)
-    pf_finder = Pathfinder(pf_grid, "ASTAR", 0)
-    pf_build_distance_field()
+    pf_finder = Pathfinder(pf_grid,"ASTAR",0)
 end
 
 
-local function pf_distance(px, py)
+-- Return path length (-1 if no path / no exit yet)
+local function pf_distance(px,py)
     if pf_dirty then
         pf_refresh()
         pf_dirty = false
     end
-    local fx = math.floor(px - pf_xmin + 1)
-    local fy = math.floor(pf_ymin - py + 1)
-
-    if pf_dist[fy] then
-        if pf_dist[fy][fx] > -1 then
-            last_distance = pf_dist[fy][fx]
-        end
+    local fx = math.floor( px - pf_xmin + 1 )
+    local fy = math.floor( pf_ymin - py + 1 )
+    local path = pf_finder and pf_finder:getPath(fx,fy,pf_goalx,pf_goaly) or nil
+    local path_length = -1
+    if path then
+        path_length = path:getLength() - 1
     end
-    return last_distance
+    return path_length
 end
-
 
 local function set_pf_dirty()
     pf_dirty = true
+    print("Refreshed")
 end
 
 set_post_entity_spawn(function(ent)
@@ -187,20 +126,19 @@ set_post_entity_spawn(function(ent)
         set_pf_dirty()
     end)
     pf_dirty = true
+    print("Refreshed")
 end, SPAWN_TYPE.ANY,MASK.FLOOR)
 
 --------------- GAME CONTROL ----------------
 
-local function reset(seed, world, level)
-    state.quest_flags = 1
+local function reset(seed)
     set_adventure_seed(seed, seed)
-    play_adventure()
-
     state.items.player_count = 1
     state.items.player_select[1].activated = true
     state.items.player_select[1].character = ENT_TYPE.CHAR_ANA_SPELUNKY
-
-    warp(world, level, world)
+    warp(1, 1, THEME.DWELLING)
+    
+    god(true)
 end
 
 local button_map = {
@@ -268,49 +206,40 @@ function get_entities_info(x, y, layer)
     return info
 end
 
--- local function get_map_info(x, y, layer)
---     local start_x, end_x = math.round(x - 10), math.round(x + 10)
---     local start_y, end_y = math.round(y - 5), math.round(y + 5)
-
---     maptiles = {}
---     for i = end_y, start_y, -1 do
---         local row = {}
---         for j = start_x, end_x do
---             local tile_id = get_grid_entity_at(j, i, layer)
-
---             if tile_id == -1 then
---                 table.insert(row, 0)
---             else
---                 table.insert(row, get_entity_type(tile_id))
---             end
---         end
---         table.insert(maptiles, row)
---     end
---     return maptiles
--- end
-
 local function get_map_info(x, y, layer)
-    if pf_dirty then
-        pf_refresh()
-    end
+    local start_x, end_x = math.round(x - 10), math.round(x + 10)
+    local start_y, end_y = math.round(y - 5), math.round(y + 5)
 
-    local sx, ex = math.round(x - 10), math.round(x + 10)
-    local sy, ey = math.round(y - 5),  math.round(y + 5)
-
-    local maptiles = {}
-    for ty = ey, sy, -1 do
+    tiles = {}
+    -- pos_type_matrix = {}
+    for i = end_y, start_y, -1 do
         local row = {}
-        for tx = sx, ex do
-            local id = 0
-            local layer_tbl = pf_tile_lookup[layer]
-            if layer_tbl and layer_tbl[ty] and layer_tbl[ty][tx] then
-                id = layer_tbl[ty][tx]
+        -- local pos_type_row = {}
+        for j = start_x, end_x do
+            local tile_id = get_grid_entity_at(j, i, layer)
+            local water_count, lava_count = get_liquids_at(j, i, layer)
+
+            -- pos_type
+            -- local pos_type_flags = {}
+            -- local keys = {}
+            -- for k in pairs(POS_TYPE) do keys[#keys+1] = k end
+            -- table.sort(keys)
+            -- for _, k in ipairs(keys) do
+            --     pos_type_flags[#pos_type_flags+1] = position_is_valid(j, i, layer, POS_TYPE[k]) and 1 or 0
+            -- end
+            -- table.insert(pos_type_row, pos_type_flags)
+            --
+
+            if tile_id == -1 then
+                table.insert(row, {0, water_count, lava_count})
+            else
+                table.insert(row, {get_entity_type(tile_id), water_count, lava_count})
             end
-            row[#row + 1] = id
         end
-        maptiles[#maptiles + 1] = row
+        table.insert(tiles, row)
+        -- table.insert(pos_type_matrix, pos_type_row)
     end
-    return maptiles
+    return tiles --, pos_type_matrix
 end
 
 
@@ -405,11 +334,13 @@ set_callback(function()
             -- print(string.format("Get info: %.6f seconds", elapsed_time))
             start = get_performance_counter()
             client:send(serialized_data .. "\n")
-
         elseif data["command"] == "reset" then
-            -- LOAD ITEMS, etc
             destroy_entities(data["ent_types_to_destroy"])
             serialized_data = json.encode(get_info(data["additional_data"]))
+            speedup = data["speedup"]
+            if speedup then
+                set_speedhack(100)
+            end
             client:send(serialized_data .. "\n")
         end
 
@@ -423,33 +354,18 @@ set_callback(function()
 
 
         if data["command"] == "reset" then
-            reset(data["seed"], data["world"], data["level"])
+            reset(data["seed"])
             data["frames"] = 60
-
-            -- INITIAL SETTINGS
-            speedup = data["speedup"]
-            if speedup then
-                set_speedhack(100)
-            end
-            manual_control = data["manual_control"]
-            if data["god_mode"] then
-                god(true)
-            else
-                god(false)
-            end
-
         elseif data["command"] == "step" and #players ~= 0 then
             local python_input = data["input"]
             local last6 = {}
             table.move(python_input, #python_input - 5, #python_input, 1, last6)
             local buttons = booleans_to_button_mask(last6)
 
-            if not manual_control then
-                steal_input(get_local_players()[1].uid)
-                -- x, y go from -1 to 1
-                local input = buttons_to_inputs(python_input[1]-1, python_input[2]-1, buttons) -- arrays in lua start at 1
-                send_input(players[1].uid, input)
-            end
+            steal_input(get_local_players()[1].uid)
+            -- x, y go from -1 to 1
+            local input = buttons_to_inputs(python_input[1]-1, python_input[2]-1, buttons) -- arrays in lua start at 1
+            send_input(players[1].uid, input)
 
         elseif data["command"] == "close" then
             os.exit()

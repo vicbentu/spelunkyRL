@@ -8,3 +8,4 @@ checkpoints/
 .vscode/
 *models/
 *models*/
+*.mp4

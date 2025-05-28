@@ -57,6 +57,7 @@ class SpelunkyEnv(SpelunkyRLEngine):
         return float(reward_val), done and not truncated, truncated
 
     def gamestate_to_observation(self, gamestate):
+        # return gamestate
 
         observation = {}
         map_info = np.array(gamestate["screen_info"]["map_info"])[:, :, 0]  # (11, 21, 3) -> (11, 21)
