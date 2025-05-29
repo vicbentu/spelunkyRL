@@ -29,13 +29,14 @@ class SpelunkyEnv(SpelunkyRLEngine):
 
     additional_data = [
         "map_info",
-        "dist_to_goal"
+        "dist_to_goal",
+        "entity_info"
     ]
 
     def action_to_input(self, action):
         return action + [0,0,0,1,0]
 
-    def reward_function(self, gamestate, last_gamestate, action):
+    def reward_function(self, gamestate, last_gamestate, action, info):
         truncated = False
         done = False
         reward_val = -0.01  # small penalty for each step to encourage faster completion
@@ -44,7 +45,7 @@ class SpelunkyEnv(SpelunkyRLEngine):
             truncated = True
             reward_val -= 5
 
-        return float(reward_val), done and not truncated, truncated
+        return float(reward_val), done and not truncated, truncated, info
 
     def gamestate_to_observation(self, gamestate):
         observation = {}

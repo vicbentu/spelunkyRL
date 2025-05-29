@@ -131,7 +131,7 @@ def make_env(i):
 if __name__ == "__main__":
 
     TOTAL_LOOPS = 16000*2
-    TIMESTEPS = 512 
+    TIMESTEPS = 2048 
 
     num_envs = 8
     env = SubprocVecEnv([make_env(i) for i in range(num_envs)])

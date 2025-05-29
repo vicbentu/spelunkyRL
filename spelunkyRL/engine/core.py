@@ -100,7 +100,7 @@ class SpelunkyRLEngine(gym.Env):
         # from collections import Counter
         # from ..tools.id2name import id2name
         # type_counts = Counter(id2name(entity[4])["name"] for entity in gamestate["entity_info"])
-        # with open(config.log_file, "a") as f:
+        # with open("log.txt", "a") as f:
         #     f.write(f"Entities: {type_counts}\n")
 
         reward, done, truncated, info = self.reward_function(gamestate, self.last_gamestate, action, info)

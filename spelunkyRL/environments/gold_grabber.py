@@ -14,7 +14,7 @@ class SpelunkyEnv(SpelunkyRLEngine):
     observation_space = Dict({
         'map_info': Box(low=0, high=116, shape=(5, 11, 21), dtype=np.int32),
         "char_state": Discrete(23),
-        "can_jump"  : Discrete(2)
+        "can_jump"  : Discrete(2),
     })
 
     action_space: gym.spaces.MultiDiscrete = gym.spaces.MultiDiscrete([
@@ -23,6 +23,8 @@ class SpelunkyEnv(SpelunkyRLEngine):
         2, # Jump
     ])
 
+
+    # oro son del 495 al 506
     reset_options = {
         "ent_types_to_destroy": [600,601] + list(range(219, 342)) + list(range(899, 906))
     }
