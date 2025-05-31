@@ -1,7 +1,9 @@
 # Exp 1 -> No LSTM, iterate over net_size
 # exit_noLSTM_....
 
-# 2-> 
+# 2-> No LSTM, iterate over learning rate
+
+# 3 -> 
 
 from sb3_contrib import RecurrentPPO
 from stable_baselines3 import PPO
@@ -125,18 +127,19 @@ if __name__ == "__main__":
 
 
     # for i, net_size in enumerate([16, 32, 64, 128]):
-    for i, lr in enumerate([1e-5, 3e-5, 1e-4, 3e-4, 1e-3]):
+    # for i, lr in enumerate([1e-5, 3e-5, 1e-4, 3e-4, 1e-3]):
+    for i, lstm_hidden_size in enumerate([64, 128, 256, 512]):
 
         checkpoint_callback = CheckpointCallback(
             save_freq=TIMESTEPS*5,
-            save_path = f"testing\\train\\2025-05-28\\models1\\{i}",
+            save_path = f"testing\\train\\2025-05-28\\models2\\{i}",
             name_prefix="ppo_spelunky",
         )
 
-        # model = RecurrentPPO(
-        model = PPO(
-            # policy="MultiInputLstmPolicy",
-            policy="MultiInputPolicy",
+        model = RecurrentPPO(
+        # model = PPO(
+            policy="MultiInputLstmPolicy",
+            # policy="MultiInputPolicy",
             env=env,
             verbose=2,
             device="cuda",
@@ -146,11 +149,11 @@ if __name__ == "__main__":
                 features_extractor_class=SpelunkyFeaturesExtractor,
                 features_extractor_kwargs={},
                 # net_arch=[net_size, net_size],
-                # lstm_hidden_size=512,
-                # n_lstm_layers=2,
+                lstm_hidden_size=lstm_hidden_size,
+                n_lstm_layers=1,
             ),
 
-            learning_rate=lr,
+            learning_rate=1e-4,
             ent_coef=0.02,
             gamma=0.98,
         )
@@ -158,7 +161,7 @@ if __name__ == "__main__":
         try:
             model.learn(
                 total_timesteps=TIMESTEPS * TOTAL_LOOPS,
-                tb_log_name="exp2_"+str(i),
+                tb_log_name="exp3_"+str(i),
                 callback=[
                     checkpoint_callback, SuccessRateCallback(verbose=1)
                 ],
