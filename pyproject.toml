@@ -11,6 +11,9 @@ dependencies = [
     "numpy",
     "torch",
     "stable-baselines3",
+    "win32gui",
+    "win32ui",
+    "psutil",
 ]
 
 [tool.setuptools.packages.find]

@@ -1,13 +1,15 @@
 import os, socket, subprocess, json, atexit, psutil, random
 from datetime import datetime
 from typing import Any, Dict, Tuple, List, Optional
-
+from collections import Counter
 
 import gymnasium as gym
 import win32gui
 
 from ..tools.frame_grabber import FrameGrabber
-from spelunkyRL.tools.window_management import get_hwnd_for_pid
+from ..tools.window_management import get_hwnd_for_pid
+from ..tools.id2name import id2name
+
 
 class SpelunkyRLEngine(gym.Env):
 
@@ -35,6 +37,7 @@ class SpelunkyRLEngine(gym.Env):
             render_enabled: bool = False,
             console: bool = False,
             log_file: str = None,
+            log_info: list[str] = [],
             **kwargs
         ) -> None:
 
@@ -49,16 +52,16 @@ class SpelunkyRLEngine(gym.Env):
         self.render_mode = 'rgb_array'
         self.console = console
         self.log_file = log_file
+        self.log_info = log_info
 
         self._game_init()
 
 
-    # TODO: seed, level, items, gold, hp
+    # TODO: level, items, gold, hp
     def reset(
         self,
         *,
         seed: Optional[int] = None,
-        # options: Optional[Dict[str, Any]] = {},
         **kwargs
     ) -> Tuple[Dict, Dict[str, Any]]:
         
@@ -89,19 +92,8 @@ class SpelunkyRLEngine(gym.Env):
             "success": False
         }
 
-        # PRINT MAP INFO
-        # with open(r"log.txt", "a") as f:
-        #     f.write(str(gamestate["map_info"]) + "\n")
-        #     f.write("----------------------------------\n")
-        #     for row in gamestate["map_info"]:
-        #         formatted_row = " ".join(f"{cell:>3}" for cell in row)
-        #         f.write(f"{formatted_row}\n")
-        # PRINT ENTITIESº
-        # from collections import Counter
-        # from ..tools.id2name import id2name
-        # type_counts = Counter(id2name(entity[4])["name"] for entity in gamestate["entity_info"])
-        # with open("log.txt", "a") as f:
-        #     f.write(f"Entities: {type_counts}\n")
+        if self.log_file:
+            self.log_step(gamestate)
 
         reward, done, truncated, info = self.reward_function(gamestate, self.last_gamestate, action, info)
         done = done or bool(gamestate["basic_info"]["health"] <= 0 or gamestate["basic_info"]["win"] == 1)
@@ -228,11 +220,6 @@ class SpelunkyRLEngine(gym.Env):
         dict = json.loads(json_str)
         if "error" in dict:
             raise RuntimeError(dict["error"])
-        
-        if self.log_file is not None:
-            with open(self.log_file, "a") as f:
-                timestamp = datetime.now().strftime("%H:%M:%S:%f")[:-3]
-                f.write(f"-- {timestamp} {str(dict)}\n")
             
         return dict
 
@@ -247,3 +234,23 @@ class SpelunkyRLEngine(gym.Env):
             raise RuntimeError("Use render_enabled=True on init to be able to record replays")
         
         return self.grabber.get_frame()
+    
+
+
+    ########### Log ################
+
+    def log_step(self, gamestate):
+        with open(self.log_file, "a") as f:
+            f.write("----------------------------------\n")
+            for field in self.log_info:
+                if field == "all":
+                    timestamp = datetime.now().strftime("%H:%M:%S:%f")[:-3]
+                    f.write(f"-- {timestamp} {str(gamestate)}\n")
+                if field == "map_info":
+                    f.write(str(gamestate["map_info"]) + "\n")
+                    for row in gamestate["map_info"]:
+                        formatted_row = " ".join(f"{cell:>3}" for cell in row)
+                        f.write(f"{formatted_row}\n")
+                elif field == "entity_count":
+                    type_counts = Counter(id2name(entity[4])["name"] for entity in gamestate["entity_info"])
+                    f.write(f"Entities: {type_counts}\n")

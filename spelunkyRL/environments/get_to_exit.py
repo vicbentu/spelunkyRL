@@ -12,7 +12,7 @@ class SpelunkyEnv(SpelunkyRLEngine):
     ################## ENV CHARACTERISTICS ##################
 
     observation_space = Dict({
-        'map_info': Box(low=0, high=116, shape=(5, 11, 21), dtype=np.int32),
+        'map_info': Box(low=0, high=116, shape=(1, 11, 21), dtype=np.int32),
         "char_state": Discrete(23),
         "can_jump"  : Discrete(2)
     })
@@ -77,17 +77,8 @@ class SpelunkyEnv(SpelunkyRLEngine):
 
     def gamestate_to_observation(self, gamestate):
         observation = {}
-        map_info = np.array(gamestate["map_info"])
 
-        m0 = (map_info == 0)                                 # empty space
-        m1 = (15 <= map_info) & (map_info <= 21)             # stairs, etc
-        m2 = (map_info == 23)                                # exit
-        m3 = np.isin(map_info, (13, 16))                     # platform
-        m4 = ~(m0 | m1 | m2 | m3)                            # else -> ground
-        multi_hot = np.stack([m0, m1, m2, m3, m4]).astype(np.uint8)
-
-        observation["map_info"] = multi_hot
-
+        observation["map_info"] = np.array(gamestate["map_info"])
         observation["char_state"] = np.int32(gamestate["basic_info"]["char_state"])
         observation["can_jump"] = np.int32(int(gamestate["basic_info"]["can_jump"]))
 
