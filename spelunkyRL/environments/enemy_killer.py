@@ -1,0 +1,82 @@
+import numpy as np
+import gymnasium as gym
+from gymnasium.spaces import Dict, Box, Discrete, Sequence, Tuple
+
+from spelunkyRL import SpelunkyRLEngine
+
+class SpelunkyEnv(SpelunkyRLEngine):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    ################## ENV CHARACTERISTICS ##################
+
+    observation_space = Dict({
+        'map_info': Box(low=0, high=116, shape=(1, 11, 21), dtype=np.int32),
+        "char_state": Discrete(23),
+        "can_jump"  : Discrete(2),
+        "enemies": Sequence(
+            Tuple((
+                Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),
+                Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),
+                Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),
+                Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),
+                Box(low=0, high=915, shape=(1,), dtype=np.float32),
+                Discrete(2),
+                Box(low=0, high=915, shape=(1,), dtype=np.float32)
+            )),
+        )
+    })
+
+    action_space: gym.spaces.MultiDiscrete = gym.spaces.MultiDiscrete([
+        3, # Movement X
+        3, # Movement Y
+        2, # Jump
+        2, # Attack
+    ])
+
+
+    reset_options = {
+        "ent_types_to_destroy": [600,601] + list(range(899, 906))
+    }
+
+    data_to_send = [
+        "map_info",
+        "entity_info"
+    ]
+
+
+    def action_to_input(self, action):
+        return action + [0,0,1,0]
+
+    def reward_function(self, gamestate, last_gamestate, action, info):
+        truncated = False
+        done = False
+
+        if gamestate["basic_info"]["time"] >= 60*90: # 90 seconds
+            truncated = True
+
+        reward_val = (last_gamestate["basic_info"]["dead_enemies"] - gamestate["basic_info"]["dead_enemies"])*0.5
+        return float(reward_val), done or truncated, truncated, info
+
+    def gamestate_to_observation(self, gamestate):
+        observation = {}
+
+        observation["map_info"] = np.array(gamestate["map_info"])
+        observation["char_state"] = np.int32(gamestate["basic_info"]["char_state"])
+        observation["can_jump"] = np.int32(int(gamestate["basic_info"]["can_jump"]))
+        observation["enemies"] = [
+            (
+                np.array([ent[0]], dtype=np.float32),
+                np.array([ent[1]], dtype=np.float32),
+                np.array([ent[2]], dtype=np.float32),
+                np.array([ent[3]], dtype=np.float32),
+                np.array([ent[4]], dtype=np.float32),
+                int(ent[5]),
+                np.array([ent[6]], dtype=np.float32)
+            )
+            for ent in gamestate["entity_info"]
+            if 219 <= ent[4] <= 342  # filtrar por tipo
+        ]
+
+        return observation

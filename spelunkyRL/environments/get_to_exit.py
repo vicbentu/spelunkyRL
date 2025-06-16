@@ -27,7 +27,7 @@ class SpelunkyEnv(SpelunkyRLEngine):
         "ent_types_to_destroy": [600,601] + list(range(219, 342)) + list(range(899, 906))
     }
 
-    additional_data = [
+    data_to_send = [
         "map_info",
         "dist_to_goal"
     ]
@@ -73,7 +73,7 @@ class SpelunkyEnv(SpelunkyRLEngine):
         # Reward getting close to the goal
         reward_val += (last_gamestate["dist_to_goal"] - gamestate["dist_to_goal"])*0.1
         
-        return float(reward_val), done and not truncated, truncated, info
+        return float(reward_val), done or truncated, truncated, info
 
     def gamestate_to_observation(self, gamestate):
         observation = {}

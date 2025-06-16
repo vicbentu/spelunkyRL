@@ -11,8 +11,7 @@ dependencies = [
     "numpy",
     "torch",
     "stable-baselines3",
-    "win32gui",
-    "win32ui",
+    "pywin32",
     "psutil",
 ]
 

@@ -2,6 +2,8 @@ import threading, ctypes
 import win32gui, win32ui
 import numpy as np
 
+import ctypes
+user=ctypes.windll.user32
 
 class FrameGrabber(threading.Thread):
     def __init__(self, hwnd):

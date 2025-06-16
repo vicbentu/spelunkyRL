@@ -11,14 +11,14 @@ local success, err = client:connect("127.0.0.1", port)
 if not success then
     error("Failed to connect: " .. tostring(err))
 end
-print("Connected to Python server!")
 
 
 --------------- GLOBAL VARIABLES ----------------
 local transition = 0
 local speedup = false
 local manual_control = false
-local speedup_counter = 100
+local state_updates = 0
+local state_update_counter = 0
 local data = {
     frames = 0,
     command = "pass"
@@ -203,6 +203,13 @@ local function reset(seed, world, level)
     warp(world, level, world)
 end
 
+local function set_start_values(restart_data)
+    players[1].health = restart_data["hp"]
+    players[1].inventory.bombs = restart_data["bombs"]
+    players[1].inventory.ropes = restart_data["ropes"]
+    players[1].inventory.money = restart_data["gold"]
+end
+
 local button_map = {
     BUTTON.JUMP,
     BUTTON.WHIP,
@@ -224,6 +231,20 @@ end
 
 
 --------------- INFO RETRIEVAL ----------------
+
+function count_dead_enemies()
+    local all_monsters = get_entities_by(0, MASK.MONSTER, LAYER.FRONT)
+    local dead_count = 0
+
+    for _, uid in ipairs(all_monsters) do
+        local ent = get_entity(uid)
+        if ent.health <= 0 then
+            dead_count = dead_count + 1
+        end
+    end
+
+    return dead_count
+end
 
 function get_entities_info(x, y, layer)
     mask = 0xFFFFFFFF & ~(MASK.DECORATION | MASK.BG | MASK.SHADOW | MASK.FLOOR | MASK.LIQUID | MASK.FX)
@@ -267,27 +288,6 @@ function get_entities_info(x, y, layer)
 
     return info
 end
-
--- local function get_map_info(x, y, layer)
---     local start_x, end_x = math.round(x - 10), math.round(x + 10)
---     local start_y, end_y = math.round(y - 5), math.round(y + 5)
-
---     maptiles = {}
---     for i = end_y, start_y, -1 do
---         local row = {}
---         for j = start_x, end_x do
---             local tile_id = get_grid_entity_at(j, i, layer)
-
---             if tile_id == -1 then
---                 table.insert(row, 0)
---             else
---                 table.insert(row, get_entity_type(tile_id))
---             end
---         end
---         table.insert(maptiles, row)
---     end
---     return maptiles
--- end
 
 local function get_map_info(x, y, layer)
     if pf_dirty then
@@ -368,6 +368,7 @@ local function get_info(additional_fields)
             theme = state.theme,
             time = state.time_level,
             win = transition,
+            dead_enemies = count_dead_enemies(),
         },
     }
     if transition == 1 then
@@ -391,14 +392,20 @@ local function get_info(additional_fields)
 end
 
 
-set_callback(function()    
+set_callback(function()
+
+    -- DISABLE PAUSE
+    local level_flags = get_level_flags()
+    level_flags = level_flags & ~(1 << 19)
+    set_level_flags(level_flags)
+
     data["frames"] = data["frames"] - 1
     if data["frames"] <= 0 then
 
         local start = get_performance_counter()
         -- SEND
         if data["command"] == "step" then
-            serialized_data = json.encode(get_info(data["additional_data"]))
+            serialized_data = json.encode(get_info(data["data_to_send"]))
             local finish = get_performance_counter()
             local freq = get_performance_frequency()
             local elapsed_time = (finish - start) / freq
@@ -409,7 +416,8 @@ set_callback(function()
         elseif data["command"] == "reset" then
             -- LOAD ITEMS, etc
             destroy_entities(data["ent_types_to_destroy"])
-            serialized_data = json.encode(get_info(data["additional_data"]))
+            set_start_values(data)
+            serialized_data = json.encode(get_info(data["data_to_send"]))
             client:send(serialized_data .. "\n")
         end
 
@@ -428,6 +436,7 @@ set_callback(function()
 
             -- INITIAL SETTINGS
             speedup = data["speedup"]
+            state_updates = data["state_updates"]
             if speedup then
                 set_speedhack(100)
             end
@@ -457,18 +466,13 @@ set_callback(function()
 
     end 
     if speedup then
-        speedup_counter = speedup_counter - 1
-        if speedup_counter <= 0 then
-            speedup_counter = 150
+        state_update_counter = state_update_counter - 1
+        if state_update_counter <= 0 then
+            state_update_counter = state_updates
             return
         end
         update_state()
     end
-
-    -- DISABLE PAUSE
-    local level_flags = get_level_flags()
-    level_flags = level_flags & ~(1 << 19)
-    set_level_flags(level_flags)
 end, ON.POST_UPDATE)
 
 set_callback(function()

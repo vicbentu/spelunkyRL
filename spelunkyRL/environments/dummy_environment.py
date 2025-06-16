@@ -22,30 +22,23 @@ class SpelunkyEnv(SpelunkyRLEngine):
     ])
 
     reset_options = {
-        "ent_types_to_destroy": [600,601] + list(range(219, 342)) + list(range(899, 906)),
+        "ent_types_to_destroy": [],
         "manual_control": True,
         "god_mode": True,
 
     }
 
-    additional_data = [
-        # "map_info",
-        # "dist_to_goal",
-    ]
+    data_to_send = []
 
     def action_to_input(self, action):
         return action + [0,0,0,1,0]
 
     def reward_function(self, gamestate, last_gamestate, action, info):
         truncated = False
-        done = False
-        reward_val = -0.01  # small penalty for each step to encourage faster completion
-
         if gamestate["basic_info"]["time"] >= 60*90: # 900 steps
             truncated = True
-            reward_val -= 5
 
-        return float(reward_val), done and not truncated, truncated, info
+        return float(0), truncated, truncated, info
 
     def gamestate_to_observation(self, gamestate):
         observation = {}

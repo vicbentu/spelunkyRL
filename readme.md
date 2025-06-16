@@ -16,7 +16,7 @@ The first step you should do is install
 [modlunky2](https://github.com/spelunky-fyi/modlunky2), following the instructions. As already explained there, it's not recommended using modding tools with your actual Steam installation.
 
 Once you've completed the first step, clone this repo into `..\Spelunky 2\Mods\Packs\`, being `..` your Spelunky 2 installation path.
-Then, create a virtual environment where you want to work (it can be that same folder if you prefer). Finally, install the library using
+Then, create a virtual environment where you want to work (it can be that same folder if you prefer, but having virtual environments on the mods folder can slow the launch process). Finally, install the library using:
 ```bash
 # If working in the same directory as the cloned repo
 pip install .
@@ -68,6 +68,7 @@ Here are the methods in the environment, defined in [`core.py`](./spelunkyRL/eng
     - hp (int, 4): starting hp.
     - bombs (int, 4): starting bombs.
     - ropes (int, 4): starting ropes.
+    - gold (int, 0): starting gold.
     - world (int, 1): from 1 to 16, which world to play. See https://spelunky-fyi.github.io/overlunky/#THEME.
     - level (int, 1): which level number within the world to play.
 
@@ -91,12 +92,9 @@ Here are the properties of the environments. Must be defined by the SpelunkyRLEn
 
 - reset_options(): allows to define the reset options, seen on the reset() method.
 
-- reward_function(gamestate, last_gamestate, action, info):
+- reward_function(gamestate, last_gamestate, action, info): defines how the reward is calculated for each step. It takes the current and previous game states (which is the information received directly from the LUA code), the action taken. Info is the returned dict by default from the gymnasium library (e.g. can be used to track the success rate).
 
-- gamestate_to_observation(gamestate):
-
-
-
+- gamestate_to_observation(gamestate): converts the gamestate directly received from the LUA code to the observation space previously defined.
 
 
 ## 🧪 Customize your Environment

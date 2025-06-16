@@ -7,7 +7,7 @@ import gymnasium as gym
 import win32gui
 
 from ..tools.frame_grabber import FrameGrabber
-from ..tools.window_management import get_hwnd_for_pid
+from ..tools.window_management import get_hwnd_for_pid, press_ctrlf4
 from ..tools.id2name import id2name
 
 
@@ -33,11 +33,10 @@ class SpelunkyRLEngine(gym.Env):
             spelunky_dir: str,
             playlunky_dir: str,
             frames_per_step: int = 6,
-            speedup: bool = True,
             render_enabled: bool = False,
             console: bool = False,
             log_file: str = None,
-            log_info: list[str] = [],
+            log_info: list[str] = ["all"],
             **kwargs
         ) -> None:
 
@@ -46,7 +45,6 @@ class SpelunkyRLEngine(gym.Env):
         self.spelunky_dir = spelunky_dir
         self.playlunky_dir = playlunky_dir
         self.frames_per_step = frames_per_step
-        self.speedup = speedup
         self.reset_options = getattr(self, "reset_options", {}) | kwargs
         self.render_enabled = render_enabled
         self.render_mode = 'rgb_array'
@@ -57,7 +55,7 @@ class SpelunkyRLEngine(gym.Env):
         self._game_init()
 
 
-    # TODO: level, items, gold, hp
+    # TODO: items, powerups
     def reset(
         self,
         *,
@@ -83,7 +81,7 @@ class SpelunkyRLEngine(gym.Env):
             "command": "step",
             "input": action,
             "frames": self.frames_per_step,
-            "additional_data": getattr(self, "additional_data", [])
+            "data_to_send": getattr(self, "data_to_send", [])
         })
         
         gamestate = self._receive_dict()
@@ -125,6 +123,11 @@ class SpelunkyRLEngine(gym.Env):
             f'-exe_dir={self.spelunky_dir}',
             *(['-console'] if self.console else [])
         ]
+
+        load_order_path = os.path.join(self.spelunky_dir, "Mods", "Packs", "load_order.txt")
+        with open(load_order_path, "w") as f:
+            f.write("spelunkyRL\n")
+
         
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.bind(('127.0.0.1', 0))
@@ -177,30 +180,35 @@ class SpelunkyRLEngine(gym.Env):
     def _game_reset(
             self,
             seed:int = None,
+            speedup: bool = False,
+            state_updates: int = 0,
+
             ent_types_to_destroy = [],
             manual_control: bool = False,
             god_mode: bool = False,
-            hp: int = 7,
-            bombs: int = 7,
-            ropes: int = 7,
+            hp: int = 4,
+            bombs: int = 4,
+            ropes: int = 4,
+            gold: int = 0,
             world: int = 1,
             level: int = 1
-            # TODO: add items, gold, powerups
         ) -> None:
         
         if seed is None:
             seed = random.randint(0, 2**32 - 1)
         self._send_dict({
             "command": "reset",
-            "speedup": self.speedup,
+            "speedup": speedup,
+            "state_updates": state_updates,
             "seed": seed,
             "ent_types_to_destroy": ent_types_to_destroy,
-            "additional_data": self.additional_data,
+            "data_to_send": self.data_to_send,
             "manual_control": manual_control,
             "god_mode": god_mode,
             "hp": hp,
             "bombs": bombs,
             "ropes": ropes,
+            "gold": gold,
             "world": world,
             "level": level
         })
