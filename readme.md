@@ -71,6 +71,7 @@ Here are the methods in the environment, defined in [`core.py`](./spelunkyRL/eng
     - gold (int, 0): starting gold.
     - world (int, 1): from 1 to 16, which world to play. See https://spelunky-fyi.github.io/overlunky/#THEME.
     - level (int, 1): which level number within the world to play.
+      ... (more options coming)
 
 - step(): applies an action, returns (observation, reward, terminated, truncated, info).
     - action: must match the environment’s action space
