@@ -10,3 +10,6 @@ testing/
 *models/
 *models*/
 *.mp4
+
+CLAUDE.md
+.claude/
