@@ -191,7 +191,8 @@ class SpelunkyRLEngine(gym.Env):
             ropes: int = 4,
             gold: int = 0,
             world: int = 1,
-            level: int = 1
+            level: int = 1,
+            **kwargs
         ) -> None:
         
         if seed is None:
