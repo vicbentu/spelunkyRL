@@ -1,10 +1,11 @@
 SpelunkyRL is a Reinforcement Learning environment, designed to provide a standard RL interface to Spelunky 2. It comes with predefined tasks but also a high degree of customability, to allow for a wide variety of experimentation.
 
-This project is built using 
-[Playlunky](https://github.com/spelunky-fyi/Playlunky),
-[modlunky2](https://github.com/spelunky-fyi/modlunky2) and
-[overlunky](https://github.com/spelunky-fyi/overlunky).
-Some information will reference these, specially the latter one, when talking about identifiers and enumerations.
+**This project is built on top of the excellent work by the spelunky-fyi community:**
+- **[overlunky](https://github.com/spelunky-fyi/overlunky)** - Provides the Lua API for game state access and manipulation
+- **[Playlunky](https://github.com/spelunky-fyi/Playlunky)** - Enables mod loading and script injection
+- **[modlunky2](https://github.com/spelunky-fyi/modlunky2)** - Mod management and installation tools
+
+Some documentation will reference these projects, especially overlunky, when discussing identifiers and enumerations.
 
 # 🚀 Getting Started
 
@@ -118,10 +119,22 @@ env = CustomSpelunkyEnv(...)
 
 - [ ] **Multi-agent scenarios**: both cooperative and competitive dynamics between multiple agents.
 
-- [ ] **Dockerization**: Streamlining the setup process and improving performance for broader accessibility.
+- [ ] **Dockerization**: streamlining the setup process and improving performance for broader accessibility.
 
 - [ ] **Performance optimization**
 
 - [ ] **Add customization options**: expanding the configuration possibilities.
 
 - [ ] ...
+
+## 🙏 Credits & Acknowledgments
+
+This project would not be possible without the incredible work of the spelunky-fyi community:
+
+- **[overlunky](https://github.com/spelunky-fyi/overlunky)** - The foundation of this project. Overlunky provides the comprehensive Lua API that enables game state access, entity manipulation, and real-time game control. All game interactions in SpelunkyRL are powered by overlunky's scripting capabilities.
+
+- **[Playlunky](https://github.com/spelunky-fyi/Playlunky)** - Essential for mod loading and Lua script injection into Spelunky 2. Playlunky makes it possible to run our custom scripts alongside the game without modifying the original executable.
+
+- **[modlunky2](https://github.com/spelunky-fyi/modlunky2)** - Provides the mod management infrastructure and tools that make setting up and running SpelunkyRL straightforward.
+
+Special thanks to the entire spelunky-fyi community for maintaining these excellent tools and fostering the Spelunky modding ecosystem.

@@ -1,3 +1,8 @@
+<!-- This file is copied from the overlunky project
+     Original source: https://github.com/spelunky-fyi/overlunky/blob/main/docs/entities-hierarchy.md
+     All credit to the overlunky project maintainers
+     License: MIT (same as overlunky project) -->
+
 # Entity hierarchy list
 The list below shows the type hierarchy for each entity in the game. This makes it easy to figure out which variables and functions are available for a specific entity.
 - 001 FLOOR_BORDERTILE = [Entity](https://spelunky-fyi.github.io/overlunky/#Entity) > [Floor](https://spelunky-fyi.github.io/overlunky/#Floor)

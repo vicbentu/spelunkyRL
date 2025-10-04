@@ -6,8 +6,8 @@ from collections import Counter
 import gymnasium as gym
 import win32gui
 
-from ..tools.frame_grabber import FrameGrabber
-from ..tools.window_management import get_hwnd_for_pid, press_ctrlf4
+from .utils.frame_grabber import FrameGrabber
+from .utils.window_management import get_hwnd_for_pid, press_ctrlf4
 from ..tools.id2name import id2name
 
 
@@ -234,6 +234,7 @@ class SpelunkyRLEngine(gym.Env):
 
     
     ############ Render ############ 
+    
     metadata = {"render_modes": ["rgb_array"], "render_fps": 60}
 
     def render(self, mode="rgb_array"):
