@@ -30,7 +30,7 @@ After that, you're all set to start using SpelunkyRL!
 
 To use any of the default environments, simply import it on your script this way. You should have the path to your Spelunky 2 game and to your playlunky installation. Both can be obtained executing modlunky and going to the settings window. The first one will appear right there, and for the second one you should click "User Directories" -> "Data". That will open a file explorer, enter the "playlunky" dir and there will be all the playlunky vesions. Copy the path to any of them.
 
-![alt text](doc/modlunky2config.png)
+![alt text](docs/modlunky2config.png)
 
 ```python
 from spelunkyRL.environments.dummy_environment import SpelunkyEnv
@@ -111,3 +111,17 @@ class CustomSpelunkyEnv(SpelunkyEnv):
 
 env = CustomSpelunkyEnv(...)
 ```
+
+## 🔮 Future Work
+
+- [ ] **Implement more tasks**: specially, long-term planning tasks that require extended sequences of actions and strategic decision-making.
+
+- [ ] **Multi-agent scenarios**: both cooperative and competitive dynamics between multiple agents.
+
+- [ ] **Dockerization**: Streamlining the setup process and improving performance for broader accessibility.
+
+- [ ] **Performance optimization**
+
+- [ ] **Add customization options**: expanding the configuration possibilities.
+
+- [ ] ...
