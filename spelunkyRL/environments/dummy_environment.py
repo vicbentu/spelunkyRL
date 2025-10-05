@@ -1,3 +1,29 @@
+"""
+Dummy Environment for Testing and Debugging
+
+A minimal environment designed for manual control and testing purposes.
+
+Observation Space:
+- Single boolean: can_jump (always returns 1, minimal observation)
+
+Action Space:
+- 3-action simplified space: [Movement X, Movement Y, Jump]
+
+Reward Function:
+- Always returns 0 (no learning, only for testing)
+- Truncates after 90 seconds
+
+Reset Options:
+- manual_control=True: Allows keyboard control of the game
+- god_mode=True: Player is invulnerable
+- No entities destroyed
+
+Use Cases:
+- Testing game mechanics manually
+- Debugging game state
+- Observing game behavior without RL
+"""
+
 import numpy as np
 import gymnasium as gym
 from gymnasium.spaces import Dict, Box, Discrete

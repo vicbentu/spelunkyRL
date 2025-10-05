@@ -6,13 +6,34 @@ build-backend = "setuptools.build_meta"
 name = "spelunkyRL"
 version = "0.1.0"
 
+# Core dependencies - required for basic SpelunkyRL functionality
 dependencies = [
     "gymnasium",
     "numpy",
-    "torch",
-    "stable-baselines3",
     "pywin32",
     "psutil",
+]
+
+# Optional dependencies for specific use cases
+[project.optional-dependencies]
+# For training RL agents (examples/train_get_to_exit.py)
+train = [
+    "torch",
+    "stable-baselines3",
+    "sb3-contrib",
+]
+
+# For recording videos (examples/record_video.py)
+video = [
+    "opencv-python",
+]
+
+# Install everything
+all = [
+    "torch",
+    "stable-baselines3",
+    "sb3-contrib",
+    "opencv-python",
 ]
 
 [tool.setuptools.packages.find]

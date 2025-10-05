@@ -1,3 +1,27 @@
+"""
+Enemy Killer Environment
+
+A combat-focused task where the agent must kill as many enemies as possible.
+
+Observation Space:
+- Terrain grid (11x21) of entity type IDs
+- Variable-length list of nearby entities with position, velocity, type, facing direction, and held item
+- Character state (current animation/action state)
+- Can jump (whether the player can currently jump)
+
+Action Space:
+- 4-action space: [Movement X, Movement Y, Jump, Attack]
+
+Reward Function:
+- Reward of 0.5 for each enemy killed
+- Truncation after 90 seconds
+
+Notes:
+- Destroys shopkeepers and traps at level start
+- Keeps enemies intact for combat
+- Entity information includes enemies filtered to types 219-342
+"""
+
 import numpy as np
 import gymnasium as gym
 from gymnasium.spaces import Dict, Box, Discrete, Sequence, Tuple

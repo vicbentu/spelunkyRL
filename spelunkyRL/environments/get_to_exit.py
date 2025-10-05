@@ -1,3 +1,23 @@
+"""
+Get to Exit Environment
+
+A goal-reaching task where the agent must navigate to the level exit as quickly as possible.
+
+Observation Space:
+- Terrain grid (11x21) of entity type IDs centered on the player
+- Character state (current animation/action state)
+- Can jump (whether the player can currently jump)
+
+Action Space:
+- 3-action simplified space: [Movement X, Movement Y, Jump]
+
+Reward Function:
+- Small step penalty (-0.01) to encourage efficiency
+- Distance-based reward shaping (reward for getting closer to exit)
+- Large bonus for reaching the exit
+- Truncation after 90 seconds or 200 steps without improvement
+"""
+
 import numpy as np
 import gymnasium as gym
 from gymnasium.spaces import Dict, Box, Discrete
