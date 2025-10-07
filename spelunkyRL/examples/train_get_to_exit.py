@@ -90,12 +90,11 @@ class SpelunkyFeaturesExtractor(BaseFeaturesExtractor):
     Custom neural network for extracting features from Spelunky observations.
 
     Architecture:
-    - Tile ID embedding layer (converts tile IDs to dense vectors)
-    - CNN for spatial feature extraction
+    - CNN for spatial feature extraction from multi-hot encoded map
     - MLP for combining map features with player state
 
     Input:
-        - map_info: (H, W) grid of tile IDs
+        - map_info: (C, H, W) multi-hot encoded map (5 channels: empty, stairs, exit, platform, ground)
         - char_state: scalar int representing player animation state
         - can_jump: binary flag (0 or 1)
 
@@ -106,21 +105,14 @@ class SpelunkyFeaturesExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space: gym.spaces.Dict, features_dim: int = 128):
         super().__init__(observation_space, features_dim)
 
-        # -------- Map Embedding -------------------------------------------------
-        map_space = observation_space["map_info"]  # Box(shape=(H,W))
+        # -------- Map CNN -------------------------------------------------------
+        map_space = observation_space["map_info"]  # Box(shape=(C, H, W))
+        self.n_channels = map_space.shape[0]  # 5 channels (empty, stairs, exit, platform, ground)
         self.H, self.W = map_space.shape[-2:]
-        max_tile_id = 114  # Highest tile ID in Spelunky 2
-        emb_dim = 8  # Embedding dimension for each tile
 
-        # Embedding layer: converts tile IDs to dense vectors
-        self.tile_emb = nn.Embedding(
-            num_embeddings=max_tile_id + 1,
-            embedding_dim=emb_dim
-        )
-
-        # CNN for processing embedded map
+        # CNN for processing multi-hot encoded map
         self.map_cnn = nn.Sequential(
-            nn.Conv2d(emb_dim, 64, kernel_size=3, padding="same"),
+            nn.Conv2d(self.n_channels, 64, kernel_size=3, padding="same"),
             nn.ReLU(),
             nn.Conv2d(64, 64, kernel_size=3, padding="same"),
             nn.ReLU(),
@@ -135,7 +127,7 @@ class SpelunkyFeaturesExtractor(BaseFeaturesExtractor):
 
         # Calculate flattened map feature size
         with torch.no_grad():
-            dummy = torch.zeros(1, emb_dim, self.H, self.W)
+            dummy = torch.zeros(1, self.n_channels, self.H, self.W)
             map_flatten = self.map_cnn(dummy).shape[1]
 
         # -------- Player Features -----------------------------------------------
@@ -151,10 +143,9 @@ class SpelunkyFeaturesExtractor(BaseFeaturesExtractor):
 
     def forward(self, observations: Dict[str, torch.Tensor]) -> torch.Tensor:
         # ---- Process Map -------------------------------------------------------
-        # (B, H, W) -> (B, H, W, emb) -> (B, emb, H, W)
-        map_ids = observations["map_info"].long()
-        map_emb = self.tile_emb(map_ids).permute(0, 3, 1, 2)
-        map_features = self.map_cnn(map_emb)
+        # (B, C, H, W) multi-hot encoded map -> CNN features
+        map_input = observations["map_info"].float()
+        map_features = self.map_cnn(map_input)
 
         # ---- Process Player State ----------------------------------------------
         # One-hot encode character state
@@ -186,9 +177,9 @@ def make_env(index: int):
     """
     def _init():
         env = SpelunkyEnv(
-            # IMPORTANT: Update these paths to match your installation
-            spelunky_dir=r"C:\TFG\Project\SpelunkyRL\Spelunky 2",
-            playlunky_dir=r"C:\Users\vicbe\AppData\Local\spelunky.fyi\modlunky2\playlunky\nightly",
+            # TODO: Update these paths to match your installation
+            spelunky_dir=r"C:\Path\To\Spelunky 2",
+            playlunky_dir=r"C:\Path\To\playlunky\nightly",
 
             # Performance settings
             frames_per_step=6,   # 6 frames between actions (~10 actions/sec)

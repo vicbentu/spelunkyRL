@@ -30,9 +30,9 @@ if __name__ == "__main__":
     print("This may take a few seconds...\n")
 
     env = SpelunkyEnv(
-        # IMPORTANT: Update these paths to match your installation
-        spelunky_dir=r"C:\TFG\Project\SpelunkyRL\Spelunky 2",
-        playlunky_dir=r"C:\Users\vicbe\AppData\Local\spelunky.fyi\modlunky2\playlunky\nightly",
+        # TODO: Update these paths to match your installation
+        spelunky_dir=r"C:\Path\To\Spelunky 2",
+        playlunky_dir=r"C:\Path\To\playlunky\nightly",
 
         # Environment settings
         frames_per_step=6,      # How many game frames per step

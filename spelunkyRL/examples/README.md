@@ -7,6 +7,7 @@ This directory contains example scripts demonstrating how to use SpelunkyRL for 
 | Script | Purpose |
 |--------|---------|
 | `manual_control.py` | Test environment with keyboard control |
+| `benchmark_performance.py` | Measure environment performance (FPS/throughput) |
 | `train_get_to_exit.py` | Train an agent from scratch |
 | `evaluate_model.py` | Evaluate a trained model |
 | `record_video.py` | Record video of trained agent |
@@ -26,7 +27,38 @@ python examples/manual_control.py
 - God mode activated (invulnerability)
 - Good for testing your setup and understanding game mechanics
 
-### 2. Train an Agent
+### 2. Benchmark Performance
+
+Measure how fast your environments run (important for training efficiency):
+
+```bash
+python examples/benchmark_performance.py --env dummy
+```
+
+**What it does:**
+- Measures steps per second (FPS) for different environments
+- Tests single or parallel environment configurations
+- Helps identify optimal settings for your hardware
+
+**Common usage:**
+```bash
+# Test a specific environment
+python examples/benchmark_performance.py --env get_to_exit
+
+# Test parallel performance
+python examples/benchmark_performance.py --env dummy --num-envs 1 2 4 8
+
+# Longer benchmark for accuracy
+python examples/benchmark_performance.py --env gold_grabber --duration 60
+```
+
+**Environments you can test:**
+- `dummy` - Minimal environment (fastest)
+- `get_to_exit` - Navigation task
+- `gold_grabber` - Collection task
+- `enemy_killer` - Combat task
+
+### 3. Train an Agent
 
 Train an RL agent to navigate to the level exit, using SB3:
 
@@ -45,7 +77,7 @@ python examples/train_get_to_exit.py
 tensorboard --logdir=./tensorboard_logs
 ```
 
-### 3. Evaluate a Trained Model
+### 4. Evaluate a Trained Model
 
 Test a trained model's performance:
 
@@ -62,7 +94,7 @@ python examples/evaluate_model.py
 - Calculates success rate and statistics
 - Reports average completion time for successful episodes
 
-### 4. Record Video of Agent
+### 5. Record Video of Agent
 
 Create a video of your trained agent playing:
 

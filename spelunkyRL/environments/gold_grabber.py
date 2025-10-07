@@ -47,13 +47,14 @@ GOLD_VALUE_MAP = {
 
 class SpelunkyEnv(SpelunkyRLEngine):
 
-    def __init__(self, **kwargs):
+    def __init__(self, target_gold=10000, **kwargs):
         super().__init__(**kwargs)
+        self.target_gold = target_gold
 
     ################## ENV CHARACTERISTICS ##################
 
     observation_space = Dict({
-        'map_info': Box(low=0, high=116, shape=(1, 11, 21), dtype=np.int32),
+        'map_info': Box(low=0, high=1, shape=(5, 11, 21), dtype=np.uint8),
         'gold_info': Box(low=0, high=np.inf, shape=(1, 11, 21), dtype=np.int32),
         "char_state": Discrete(23),
         "can_jump": Discrete(2),
@@ -87,8 +88,35 @@ class SpelunkyEnv(SpelunkyRLEngine):
         last_money = last_gamestate["basic_info"]["money"] if last_gamestate else current_money
         delta_money = current_money - last_money
 
-        # Reward based on gold collected this step
-        reward_val = delta_money / 1000.0
+        # Distance-based reward shaping: reward for getting closer to gold
+        # Max visible distance: corner to corner (11 vertical, 11 horizontal)
+        MAX_VISIBLE_DIST = np.sqrt(11**2 + 6**2)
+
+        min_distance = MAX_VISIBLE_DIST
+        for ent in gamestate["entity_info"]:
+            if ent[4] in GOLD_VALUE_MAP:  # Is gold entity
+                # Player is at (0, 0) in entity coordinate space
+                dist = np.sqrt(ent[0]**2 + ent[1]**2)
+                min_distance = min(min_distance, dist)
+
+        # Only apply distance reward when NO gold was collected
+        # (prevents negative reward when nearest gold disappears after collection)
+        if delta_money == 0 and last_gamestate is not None:
+            last_min_distance = MAX_VISIBLE_DIST
+            for ent in last_gamestate["entity_info"]:
+                if ent[4] in GOLD_VALUE_MAP:
+                    dist = np.sqrt(ent[0]**2 + ent[1]**2)
+                    last_min_distance = min(last_min_distance, dist)
+
+            # Reward for getting closer to gold (penalize for moving away)
+            distance_delta = last_min_distance - min_distance
+            reward_val += distance_delta * 0.5
+            info["distance_delta"] = distance_delta
+
+        info["distance_to_gold"] = min_distance
+
+        # Reward based on gold collected this step (balanced scale)
+        reward_val += delta_money / 500.0
 
         # Update episode gold counter
         episode_gold = getattr(self, "episode_gold", 0)
@@ -101,7 +129,7 @@ class SpelunkyEnv(SpelunkyRLEngine):
         info["gold_collected"] = episode_gold
 
         # Time limit: 30 seconds
-        if gamestate["basic_info"]["time"] >= 60 * 30:
+        if gamestate["basic_info"]["time"] >= 60 * 90:
             truncated = True
 
         # Reset episode gold on episode end
@@ -117,8 +145,17 @@ class SpelunkyEnv(SpelunkyRLEngine):
     def gamestate_to_observation(self, gamestate):
         observation = {}
 
-        # Terrain grid
-        observation["map_info"] = np.array(gamestate["map_info"])[np.newaxis, :, :]
+        # Terrain grid with multi-hot encoding
+        map_info = np.array(gamestate["map_info"])
+
+        m0 = (map_info == 0)                                 # empty space
+        m1 = (15 <= map_info) & (map_info <= 21)             # stairs, etc
+        m2 = (map_info == 23)                                # exit
+        m3 = np.isin(map_info, (13, 16))                     # platform
+        m4 = ~(m0 | m1 | m2 | m3)                            # else -> ground
+        multi_hot = np.stack([m0, m1, m2, m3, m4]).astype(np.uint8)
+
+        observation["map_info"] = multi_hot
 
         # Character state
         observation["char_state"] = np.int32(np.clip(gamestate["basic_info"]["char_state"], 0, 22))

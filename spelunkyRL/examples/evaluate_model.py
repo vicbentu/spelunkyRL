@@ -50,9 +50,9 @@ def make_env(index: int):
     """Create a single Spelunky environment for evaluation"""
     def _init():
         env = SpelunkyEnv(
-            # IMPORTANT: Update these paths to match your installation
-            spelunky_dir=r"C:\TFG\Project\SpelunkyRL\Spelunky 2",
-            playlunky_dir=r"C:\Users\vicbe\AppData\Local\spelunky.fyi\modlunky2\playlunky\nightly",
+            # TODO: Update these paths to match your installation
+            spelunky_dir=r"C:\Path\To\Spelunky 2",
+            playlunky_dir=r"C:\Path\To\playlunky\nightly",
 
             frames_per_step=6,
             speedup=SPEEDUP,

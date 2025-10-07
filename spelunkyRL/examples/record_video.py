@@ -88,9 +88,9 @@ def record_agent_video(
         # -------- Initialize Environment -------------------------------------
         print("Initializing environment with rendering enabled...")
         env = SpelunkyEnv(
-            # IMPORTANT: Update these paths to match your installation
-            spelunky_dir=r"C:\TFG\Project\SpelunkyRL\Spelunky 2",
-            playlunky_dir=r"C:\Users\vicbe\AppData\Local\spelunky.fyi\modlunky2\playlunky\nightly",
+            # TODO: Update these paths to match your installation
+            spelunky_dir=r"C:\Path\To\Spelunky 2",
+            playlunky_dir=r"C:\Path\To\playlunky\nightly",
 
             frames_per_step=2,      # Capture more frames for smoother video
             speedup=False,          # Don't speed up (real-time looks better)
